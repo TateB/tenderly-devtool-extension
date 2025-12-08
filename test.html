@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Tenderly Extension Test</title>
+</head>
+
+<body>
+  <h1>Test Page for Tenderly Extension</h1>
+  <button id="sendRequest">Send eth_estimateGas Request</button>
+  <button id="sendComplexRequest">Send Complex Request (State Diff)</button>
+  <div id="output"></div>
+
+  <script>
+    const output = document.getElementById('output')
+
+    async function sendRpc(payload) {
+      output.textContent = 'Sending request...'
+      try {
+        const response = await fetch('https://jsonplaceholder.typicode.com/posts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        output.textContent = 'Request sent! Check the Tenderly panel in DevTools.'
+      } catch (err) {
+        output.textContent = 'Error: ' + err.message
+      }
+    }
+
+    document.getElementById('sendRequest').addEventListener('click', async () => {
+      const payload = {
+        jsonrpc: "2.0",
+        method: "eth_estimateGas",
+        params: [{
+          from: "0x123",
+          to: "0x456",
+          value: "0x100",
+          data: "0xabcdef"
+        }],
+        id: 1
+      }
+      await sendRpc(payload)
+    })
+
+    document.getElementById('sendComplexRequest').addEventListener('click', async () => {
+      const payload = {
+        "jsonrpc": "2.0",
+        "id": 86,
+        "method": "eth_estimateGas",
+        "params": [
+          {
+            "accessList": [
+              {
+                "address": "0x69420f05a11f617b4b74ffe2e04b2d300dfa556f",
+                "storageKeys": []
+              }
+            ],
+            "data": "0xef9c8805000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001000000000000000000000000069420f05a11f617b4b74ffe2e04b2d300dfa556f0000000000000000000000000000000000000000000000000000000001e133809923eb94000000033fe524f9e2bbce4e536815dced444e5987d42b0decb4938c000000000000000000000000f29100983e058b709f3d539b0c765937b804ac1500000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000076b6670736b6566000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000a48b95dd717491f829490d23911e6048da4428fe374d1ae6ac4d9c33d6c9520ca55b04d6d7000000000000000000000000000000000000000000000000000000000000003c00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000014f29100983e058b709f3d539b0c765937b804ac1500000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "from": "0x69420f05A11f617B4B74fFe2E04B2D300dFA556F",
+            "to": "0x59E16fcCd424Cc24e280Be16E11Bcd56fb0CE547",
+            "value": "0x5d38e17c25245"
+          },
+          "latest",
+          {
+            "0x59E16fcCd424Cc24e280Be16E11Bcd56fb0CE547": {
+              "stateDiff": {
+                "0x2fd64664c3b02bb1647a43e2afdd792f2bda707136a038161ca74a6e6ba12f82": "0x00000000000000000000000000000000000000000000000000000000693636a7"
+              }
+            },
+            "0x69420f05A11f617B4B74fFe2E04B2D300dFA556F": {
+              "balance": "0xd3c21bda398bc58c14c4"
+            }
+          }
+        ]
+      }
+      await sendRpc(payload)
+    });
+  </script>
+</body>
+
+</html>
