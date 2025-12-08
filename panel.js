@@ -15,6 +15,7 @@ let hasRequests = false;
 const apiKeyInput = document.getElementById('api-key');
 const accountSlugInput = document.getElementById('account-slug');
 const projectSlugInput = document.getElementById('project-slug');
+const chainIdInput = document.getElementById('chain-id-override');
 const saveBtn = document.getElementById('save-config');
 const saveStatus = document.getElementById('save-status');
 const configSection = document.getElementById('config-section');
@@ -26,10 +27,11 @@ settingsToggle.onclick = () => {
 };
 
 // Load saved config
-chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug'], (result) => {
+chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug', 'tenderly_chain_id'], (result) => {
     if (result.tenderly_api_key) apiKeyInput.value = result.tenderly_api_key;
     if (result.tenderly_account_slug) accountSlugInput.value = result.tenderly_account_slug;
     if (result.tenderly_project_slug) projectSlugInput.value = result.tenderly_project_slug;
+    if (result.tenderly_chain_id) chainIdInput.value = result.tenderly_chain_id;
     
     // Auto-hide if all configured
     if (result.tenderly_api_key && result.tenderly_account_slug && result.tenderly_project_slug) {
@@ -43,11 +45,13 @@ saveBtn.addEventListener('click', () => {
     const key = apiKeyInput.value.trim();
     const account = accountSlugInput.value.trim();
     const project = projectSlugInput.value.trim();
+    const chainId = chainIdInput.value.trim();
 
     chrome.storage.local.set({
         'tenderly_api_key': key,
         'tenderly_account_slug': account,
-        'tenderly_project_slug': project
+        'tenderly_project_slug': project,
+        'tenderly_chain_id': chainId
     }, () => {
         saveStatus.style.display = 'block';
         setTimeout(() => saveStatus.style.display = 'none', 3000);
@@ -148,7 +152,7 @@ function addRequestToList(rpcRequest, url) {
 
 async function simulateTransaction(rpcRequest, url, btn, container) {
     // Get config
-    const config = await new Promise(resolve => chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug'], resolve));
+    const config = await new Promise(resolve => chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug', 'tenderly_chain_id'], resolve));
     
     if (!config.tenderly_api_key || !config.tenderly_account_slug || !config.tenderly_project_slug) {
         alert('Please configure API Key, Account Slug, and Project Slug first (click the settings icon).');
@@ -164,7 +168,10 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
         const txParams = rpcRequest.params[0];
         const stateOverrides = rpcRequest.params[2];
 
-        const networkId = await detectNetwork(url);
+        let networkId = config.tenderly_chain_id;
+        if (!networkId) {
+             networkId = await detectNetwork(url);
+        }
 
         // Map params to Renderly Simulation structure
         const simulationBody = {
