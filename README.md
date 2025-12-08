@@ -35,7 +35,3 @@ A Chrome DevTools extension that inspects `eth_estimateGas` JSON-RPC requests fr
 3. Open the **Tenderly** tab in DevTools.
 4. Locate the captured request and click **Simulate**.
 5. Once complete, click **View** to open the detailed simulation in Tenderly.
-
-## Supported Networks
-
-The extension attempts to auto-detect the network ID based on the RPC URL (Mainnet, Sepolia, Holesky, Goerli). Defaults to Mainnet (1) if detection fails.

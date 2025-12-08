@@ -164,7 +164,7 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
         const txParams = rpcRequest.params[0];
         const stateOverrides = rpcRequest.params[2];
 
-        const networkId = detectNetwork(url);
+        const networkId = await detectNetwork(url);
 
         // Map params to Renderly Simulation structure
         const simulationBody = {
@@ -278,8 +278,34 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
     }
 }
 
-function detectNetwork(requestUrl) {
-    if (!requestUrl) return '1'; 
+async function detectNetwork(requestUrl) {
+    if (!requestUrl) return '1';
+    
+    try {
+        const response = await fetch(requestUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'eth_chainId',
+                params: [],
+                id: 1
+            })
+        });
+
+        if (!response.ok) throw new Error('Fetch failed');
+        
+        const data = await response.json();
+        if (data.result) {
+            return parseInt(data.result, 16).toString();
+        }
+    } catch (e) {
+        console.warn('Could not detect network via RPC, defaulting to mainnet', e);
+    }
+    
+    // Fallback based on URL pattern if RPC fails, or just default to 1
     const lowerUrl = requestUrl.toLowerCase();
     
     if (lowerUrl.includes('sepolia')) return '11155111';
