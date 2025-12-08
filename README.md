@@ -26,6 +26,7 @@ A Chrome DevTools extension that inspects `eth_estimateGas` JSON-RPC requests fr
    - **API Key**: Generated from your Tenderly dashboard settings.
    - **Account Slug**: Your username or organization name.
    - **Project Slug**: The specific project identifier.
+   - **Chain ID Override**: Optional, override the detected chain ID.
 5. Click **Save Configuration**.
 
 ## Usage
