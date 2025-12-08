@@ -1,138 +1,60 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
-  <style>
-    :root {
-      --bg-color: #ffffff;
-      --text-color: #333333;
-      --border-color: #e0e0e0;
-      --hover-bg: #f5f5f5;
-      --method-color: #d03030;
-      /* Red-ish for POST usually, or blue */
-      --url-color: #666;
-      --details-bg: #fafafa;
-      --pre-color: #242424;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg-color: #242424;
-        --text-color: #d1d1d1;
-        --border-color: #333;
-        --hover-bg: #2a2a2a;
-        --method-color: #61afef;
-        --url-color: #999;
-        --details-bg: #1e1e1e;
-        --pre-color: #d1d1d1;
-      }
-    }
-
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-    }
-
-    #request-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-
-    .request-item {
-      border-bottom: 1px solid var(--border-color);
-      cursor: pointer;
-    }
-
-    .request-summary {
-      padding: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .request-summary:hover {
-      background-color: var(--hover-bg);
-    }
-
-    .method-name {
-      font-weight: bold;
-      color: var(--method-color);
-    }
-
-    .url-preview {
-      font-size: 0.85em;
-      color: var(--url-color);
-      margin-left: 10px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 300px;
-    }
-
-    .request-details {
-      display: none;
-      padding: 10px;
-      background-color: var(--details-bg);
-      border-top: 1px solid var(--border-color);
-      font-family: monospace;
-      white-space: pre-wrap;
-      word-break: break-all;
-      font-size: 12px;
-      color: var(--pre-color);
-    }
-
-    .request-item.expanded .request-details {
-      display: block;
-    }
-
-    button {
-      background-color: #4a90e2;
-      color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-    }
-
-    button:hover {
-      background-color: #357abd;
-    }
-
-    .empty-state {
-      padding: 20px;
-      text-align: center;
-      color: var(--url-color);
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tenderly DevTools</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-  <div
-    style="padding: 10px; border-bottom: 1px solid var(--border-color); background: var(--bg-color); display: flex; justify-content: flex-end;">
-    <button id="settings-toggle"
-      style="background: none; border: none; font-size: 16px; cursor: pointer; color: var(--text-color);">⚙️</button>
-  </div>
-  <div id="config-section"
-    style="padding: 10px; border-bottom: 1px solid var(--border-color); background: var(--hover-bg); display: none;">
-    <input type="password" id="api-key" placeholder="Enter Tenderly API Key"
-      style="padding: 5px; width: 100%; margin-bottom: 5px; box-sizing: border-box;">
-    <div style="display: flex; gap: 5px;">
-      <input type="text" id="account-slug" placeholder="Account Slug" style="padding: 5px; flex: 1;">
-      <input type="text" id="project-slug" placeholder="Project Slug" style="padding: 5px; flex: 1;">
+
+  <header>
+    <h1>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z"
+          fill="#7D69FF" />
+        <path d="M8 12H16M12 8V16" stroke="white" stroke-width="2" stroke-linecap="round" />
+      </svg>
+      Simulate Requests
+    </h1>
+    <button id="settings-toggle" class="icon-btn" title="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path
+          d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+        </path>
+      </svg>
+    </button>
+  </header>
+
+  <div id="config-section" style="display: none;">
+    <div class="input-group">
+      <input type="password" id="api-key" placeholder="Tenderly API Key">
     </div>
-    <button id="save-config" style="margin-top: 5px; width: 100%;">Save Configuration</button>
-    <span id="save-status"
-      style="margin-top: 5px; display: block; text-align: center; font-size: 12px; color: green; display: none;">Saved!</span>
+    <div class="input-row">
+      <input type="text" id="account-slug" placeholder="Account Slug">
+      <input type="text" id="project-slug" placeholder="Project Slug">
+    </div>
+    <button id="save-config" class="btn-primary" style="width: 100%; margin-top: 12px;">
+      Save Configuration
+    </button>
+    <div id="save-status"
+      style="text-align: center; margin-top: 8px; font-size: 12px; color: var(--accent-success); display: none;">
+      Settings Saved Successfully
+    </div>
   </div>
-  <div id="request-list">
-    <div class="empty-state">Waiting for eth_estimateGas requests...</div>
-  </div>
+
+  <main id="request-list">
+    <div class="empty-state">
+      <div class="empty-icon">📡</div>
+      <p>Listening for <code>eth_estimateGas</code> requests...</p>
+      <small>Requests will appear here as you browse.</small>
+    </div>
+  </main>
+
   <script src="panel.js"></script>
 </body>
 

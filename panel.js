@@ -1,5 +1,14 @@
 
 const listElement = document.getElementById('request-list');
+// Maintain a reference to the empty state so we can restore it or hide it
+const emptyStateHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">📡</div>
+      <p>Listening for <code>eth_estimateGas</code> requests...</p>
+      <small>Requests will appear here as you browse.</small>
+    </div>
+`;
+
 let hasRequests = false;
 
 // Config Handling
@@ -26,7 +35,7 @@ chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly
     if (result.tenderly_api_key && result.tenderly_account_slug && result.tenderly_project_slug) {
         configSection.style.display = 'none';
     } else {
-        configSection.style.display = 'block';
+        configSection.style.display = 'block'; // Show if not configured
     }
 });
 
@@ -41,7 +50,7 @@ saveBtn.addEventListener('click', () => {
         'tenderly_project_slug': project
     }, () => {
         saveStatus.style.display = 'block';
-        setTimeout(() => saveStatus.style.display = 'none', 2000);
+        setTimeout(() => saveStatus.style.display = 'none', 3000);
         // Hide config after save
         setTimeout(() => configSection.style.display = 'none', 1000);
     });
@@ -79,54 +88,62 @@ function addRequestToList(rpcRequest, url) {
     const item = document.createElement('li');
     item.className = 'request-item';
 
-    const summaryDiv = document.createElement('div');
-    summaryDiv.className = 'request-summary';
-    summaryDiv.onclick = (e) => {
+    const containerDiv = document.createElement('div');
+    containerDiv.className = 'request-container';
+    containerDiv.onclick = (e) => {
         // Only toggle if not clicking interactive elements inside
         if (['BUTTON', 'A', 'INPUT'].includes(e.target.tagName)) return;
         item.classList.toggle('expanded');
     };
 
     const infoDiv = document.createElement('div');
+    infoDiv.className = 'request-info';
     
-    const methodSpan = document.createElement('span');
-    methodSpan.className = 'method-name';
-    methodSpan.textContent = rpcRequest.method;
+    const methodBadge = document.createElement('span');
+    methodBadge.className = 'method-badge';
+    methodBadge.textContent = rpcRequest.method;
     
     const paramsPreview = document.createElement('span');
-    paramsPreview.className = 'url-preview';
+    paramsPreview.className = 'url-text';
     try {
         const paramsStr = JSON.stringify(rpcRequest.params);
-        paramsPreview.textContent = paramsStr.length > 50 ? paramsStr.substring(0, 50) + '...' : paramsStr;
+        paramsPreview.textContent = paramsStr;
     } catch(e) {}
 
-    infoDiv.appendChild(methodSpan);
+    infoDiv.appendChild(methodBadge);
     infoDiv.appendChild(paramsPreview);
 
     const actionContainer = document.createElement('div');
     actionContainer.style.display = 'flex';
     actionContainer.style.alignItems = 'center';
-    actionContainer.style.gap = '5px';
+    actionContainer.style.gap = '8px';
 
     const btn = document.createElement('button');
-    btn.textContent = 'Simulate with Tenderly';
+    btn.className = 'btn-primary';
+    btn.innerHTML = '<span>Simulate</span>';
     btn.onclick = async (e) => {
         e.stopPropagation();
         await simulateTransaction(rpcRequest, url, btn, actionContainer);
     };
 
     actionContainer.appendChild(btn);
-    summaryDiv.appendChild(infoDiv);
-    summaryDiv.appendChild(actionContainer);
+    containerDiv.appendChild(infoDiv);
+    containerDiv.appendChild(actionContainer);
 
     const detailsDiv = document.createElement('div');
     detailsDiv.className = 'request-details';
-    detailsDiv.textContent = JSON.stringify(rpcRequest, null, 2);
+    
+    // Pretty print JSON
+    const pre = document.createElement('pre');
+    pre.style.margin = '0';
+    pre.textContent = JSON.stringify(rpcRequest, null, 2);
+    detailsDiv.appendChild(pre);
 
-    item.appendChild(summaryDiv);
+    item.appendChild(containerDiv);
     item.appendChild(detailsDiv);
 
-    listElement.appendChild(item);
+    // Prepend to list (newest first)
+    listElement.insertBefore(item, listElement.firstChild);
 }
 
 async function simulateTransaction(rpcRequest, url, btn, container) {
@@ -134,14 +151,14 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
     const config = await new Promise(resolve => chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug'], resolve));
     
     if (!config.tenderly_api_key || !config.tenderly_account_slug || !config.tenderly_project_slug) {
-        alert('Please configure API Key, Account Slug, and Project Slug first (click the settings cog).');
+        alert('Please configure API Key, Account Slug, and Project Slug first (click the settings icon).');
         configSection.style.display = 'block';
         return;
     }
 
-    btn.textContent = 'Simulating...';
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span>Simulating...</span>';
     btn.disabled = true;
-    btn.style.opacity = '0.7';
 
     try {
         const txParams = rpcRequest.params[0];
@@ -210,20 +227,20 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
 
         const data = await response.json();
         const simulationId = data.simulation.id;
-        const status = data.simulation.status; // boolean usually? or "true"/"false"? API says status is boolean (true=success)
+        const status = data.simulation.status; 
 
         // 2. Share Simulation
-        // Path: /api/v1/account/{accountSlug}/project/{projectSlug}/simulations/{simulationId}/share
-        const shareResponse = await fetch(`https://api.tenderly.co/api/v1/account/${config.tenderly_account_slug}/project/${config.tenderly_project_slug}/simulations/${simulationId}/share`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Access-Key': config.tenderly_api_key
-            }
-        });
-
-        // Even if share fails, we can show the link, but it might not be accessible if permissions are strict.
-        // Assuming user has correct permissions.
+        try {
+            await fetch(`https://api.tenderly.co/api/v1/account/${config.tenderly_account_slug}/project/${config.tenderly_project_slug}/simulations/${simulationId}/share`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Access-Key': config.tenderly_api_key
+                }
+            });
+        } catch (shareErr) {
+            console.warn('Share failed', shareErr);
+        }
 
         // Update UI
         btn.style.display = 'none'; // Hide button
@@ -231,36 +248,32 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
         // Status Indicator
         const statusSpan = document.createElement('span');
         if (status === true) {
-            statusSpan.textContent = '✅ Success ';
-            statusSpan.style.color = '#4caf50';
+            statusSpan.className = 'status-success';
+            statusSpan.innerHTML = '<span>Success</span>';
         } else {
-            statusSpan.textContent = '❌ Reverted ';
-            statusSpan.style.color = '#f44336';
+            statusSpan.className = 'status-error';
+            statusSpan.innerHTML = '<span>Reverted</span>';
         }
-        statusSpan.style.fontSize = '12px';
-        statusSpan.style.marginRight = '5px';
         
         const link = document.createElement('a');
-        link.textContent = 'View Simulation';
+        link.className = 'link-external';
+        link.textContent = 'View →';
         link.href = `https://www.tdly.co/shared/simulation/${simulationId}`;
         link.target = '_blank';
-        link.style.color = '#4a90e2';
-        link.style.textDecoration = 'none';
-        link.style.fontWeight = 'bold';
         
         container.appendChild(statusSpan);
         container.appendChild(link);
 
     } catch (err) {
         console.error(err);
-        btn.textContent = 'Error';
+        btn.innerHTML = '<span>Error</span>';
         btn.title = err.message;
-        btn.style.backgroundColor = '#f44336';
-        btn.style.opacity = '1';
+        btn.style.backgroundColor = 'var(--accent-error)';
+        
         setTimeout(() => {
-            btn.textContent = 'Simulate with Tenderly';
+            btn.innerHTML = originalText;
             btn.disabled = false;
-            btn.style.backgroundColor = '#4a90e2';
+            btn.style.backgroundColor = '';
         }, 3000);
     }
 }

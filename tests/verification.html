@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tenderly DevTools Verification</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script>
+    // Mock Chrome API
+    window.chrome = {
+      devtools: {
+        network: {
+          onRequestFinished: {
+            addListener: (cb) => { console.log('Listener added') }
+          }
+        }
+      },
+      storage: {
+        local: {
+          get: (keys, cb) => {
+            const defaults = {
+              tenderly_api_key: 'mock-key',
+              tenderly_account_slug: 'mock-account',
+              tenderly_project_slug: 'mock-project'
+            }
+            cb(defaults)
+          },
+          set: (items, cb) => {
+            console.log('Storage saved:', items)
+            if (cb) cb()
+          }
+        }
+      }
+    }
+
+    // Mock Fetch for Success State
+    window.originalFetch = window.fetch
+    window.fetch = async (url, options) => {
+      console.log('Mock fetch called for:', url)
+      if (url.includes('api.tenderly.co')) {
+        // Return success response
+        return {
+          ok: true,
+          text: async () => "{}",
+          json: async () => ({
+            simulation: {
+              id: 'mock-sim-id-123',
+              status: true
+            }
+          })
+        }
+      }
+      return window.originalFetch(url, options)
+    };
+  </script>
+</head>
+
+<body>
+
+  <header>
+    <h1>
+      <!-- Using a placeholder or local image if favicon fails to load cross-origin -->
+      <span style="font-size: 16px;">🟣</span>
+      Simulate Requests (Mock)
+    </h1>
+    <button id="settings-toggle" class="icon-btn" title="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path
+          d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+        </path>
+      </svg>
+    </button>
+  </header>
+
+  <div id="config-section" style="display: none;">
+    <div class="input-group">
+      <input type="password" id="api-key" placeholder="Tenderly API Key">
+    </div>
+    <div class="input-row">
+      <input type="text" id="account-slug" placeholder="Account Slug">
+      <input type="text" id="project-slug" placeholder="Project Slug">
+    </div>
+    <button id="save-config" class="btn-primary" style="width: 100%; margin-top: 12px;">
+      Save Configuration
+    </button>
+    <div id="save-status"
+      style="text-align: center; margin-top: 8px; font-size: 12px; color: var(--accent-success); display: none;">
+      Settings Saved Successfully
+    </div>
+  </div>
+
+  <main id="request-list">
+    <!-- Items will be injected here -->
+  </main>
+
+  <script src="../panel.js"></script>
+
+  <script>
+    // Simulate incoming request
+    setTimeout(() => {
+      const mockRequest = {
+        method: 'eth_estimateGas',
+        params: [{
+          from: "0x123...",
+          to: "0x456...",
+          value: "0x100",
+          data: "0xabcdef..."
+        }]
+      }
+      addRequestToList(mockRequest, 'http://localhost:8545')
+
+      // Add another one
+      setTimeout(() => {
+        const mockRequest2 = {
+          method: 'eth_estimateGas',
+          params: [{
+            from: "0xUserWallet",
+            to: "0xUniswapRouter",
+            data: "0xswapTokens..."
+          }]
+        }
+        addRequestToList(mockRequest2, 'https://mainnet.infura.io/v3/...')
+      }, 500)
+
+    }, 500);
+  </script>
+</body>
+
+</html>
