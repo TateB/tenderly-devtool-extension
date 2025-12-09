@@ -1,68 +1,197 @@
 
+// DOM Elements
 const listElement = document.getElementById('request-list');
-// Maintain a reference to the empty state so we can restore it or hide it
-const emptyStateHTML = `
-    <div class="empty-state">
-      <div class="empty-icon">📡</div>
-      <p>Listening for <code>eth_estimateGas</code> requests...</p>
-      <small>Requests will appear here as you browse.</small>
-    </div>
-`;
+const saveStatus = document.getElementById('save-status');
 
-let hasRequests = false;
+// Tabs
+const tabButtons = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+const welcomeScreen = document.getElementById('welcome-screen');
+const getStartedBtn = document.getElementById('get-started-btn');
 
-// Config Handling
+// Config Inputs
 const apiKeyInput = document.getElementById('api-key');
 const accountSlugInput = document.getElementById('account-slug');
 const projectSlugInput = document.getElementById('project-slug');
 const chainIdInput = document.getElementById('chain-id-override');
 const saveBtn = document.getElementById('save-config');
-const saveStatus = document.getElementById('save-status');
-const configSection = document.getElementById('config-section');
-const settingsToggle = document.getElementById('settings-toggle');
+const resetBtn = document.getElementById('reset-config');
 
-// Toggle Settings
-settingsToggle.onclick = () => {
-    configSection.style.display = configSection.style.display === 'none' ? 'block' : 'none';
-};
+const interceptEstimateGasInput = document.getElementById('intercept-estimate-gas');
+const interceptEthCallInput = document.getElementById('intercept-eth-call');
+const interceptRevertedOnlyInput = document.getElementById('intercept-reverted-only');
 
-// Load saved config
-chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug', 'tenderly_chain_id'], (result) => {
-    if (result.tenderly_api_key) apiKeyInput.value = result.tenderly_api_key;
-    if (result.tenderly_account_slug) accountSlugInput.value = result.tenderly_account_slug;
-    if (result.tenderly_project_slug) projectSlugInput.value = result.tenderly_project_slug;
-    if (result.tenderly_chain_id) chainIdInput.value = result.tenderly_chain_id;
-    
-    // Auto-hide if all configured
-    if (result.tenderly_api_key && result.tenderly_account_slug && result.tenderly_project_slug) {
-        configSection.style.display = 'none';
-    } else {
-        configSection.style.display = 'block'; // Show if not configured
+// State
+let hasRequests = false;
+let currentConfig = {};
+
+// --- Initialization ---
+
+init();
+
+function init() {
+    setupTabs();
+    loadConfig();
+    setupEventListeners();
+}
+
+function setupTabs() {
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabName = btn.dataset.tab;
+            
+            // Update Buttons
+            tabButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            // Update Content
+            tabContents.forEach(c => {
+                c.classList.remove('active');
+                if (c.id === `tab-${tabName}`) c.classList.add('active');
+            });
+        });
+    });
+
+    // Sub-Tabs Logic
+    function initSubTabs() {
+        const subTabButtons = document.querySelectorAll('.sub-tab-btn');
+        const subTabContents = document.querySelectorAll('.sub-tab-content');
+
+        if (!subTabButtons.length) return;
+
+        subTabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const subTabName = btn.dataset.subtab;
+                
+                // Update Buttons
+                subTabButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // Update Content
+                subTabContents.forEach(c => {
+                    c.classList.remove('active');
+                    if (c.id === `subtab-${subTabName}`) c.classList.add('active');
+                });
+            });
+        });
     }
-});
 
-saveBtn.addEventListener('click', () => {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSubTabs);
+    } else {
+        initSubTabs();
+    }
+
+    getStartedBtn.addEventListener('click', () => {
+        welcomeScreen.style.display = 'none';
+        const settingsTabBtn = document.querySelector('[data-tab="settings"]');
+        if (settingsTabBtn) settingsTabBtn.click();
+    });
+}
+
+function setupEventListeners() {
+    saveBtn.addEventListener('click', saveConfig);
+    resetBtn.addEventListener('click', resetConfig);
+    
+    // Listen for network refquests
+    chrome.devtools.network.onRequestFinished.addListener(handleRequest);
+}
+
+// --- Configuration ---
+
+function loadConfig() {
+    const keys = [
+        'tenderly_api_key', 
+        'tenderly_account_slug', 
+        'tenderly_project_slug', 
+        'tenderly_chain_id',
+        'intercept_methods',
+        'intercept_reverted_only'
+    ];
+
+    chrome.storage.local.get(keys, (result) => {
+        currentConfig = result;
+
+        // Populate Inputs
+        if (result.tenderly_api_key) apiKeyInput.value = result.tenderly_api_key;
+        if (result.tenderly_account_slug) accountSlugInput.value = result.tenderly_account_slug;
+        if (result.tenderly_project_slug) projectSlugInput.value = result.tenderly_project_slug;
+        if (result.tenderly_chain_id) chainIdInput.value = result.tenderly_chain_id;
+
+        // Checkboxes
+        // Default to estimateGas if undefined
+        const methods = result.intercept_methods || ['eth_estimateGas']; 
+        interceptEstimateGasInput.checked = methods.includes('eth_estimateGas');
+        interceptEthCallInput.checked = methods.includes('eth_call');
+        
+        interceptRevertedOnlyInput.checked = !!result.intercept_reverted_only;
+
+        // Show Welcome Screen if no API key
+        if (!result.tenderly_api_key) {
+            welcomeScreen.style.display = 'flex';
+        } else {
+            welcomeScreen.style.display = 'none';
+        }
+    });
+}
+
+function saveConfig() {
     const key = apiKeyInput.value.trim();
     const account = accountSlugInput.value.trim();
     const project = projectSlugInput.value.trim();
     const chainId = chainIdInput.value.trim();
 
-    chrome.storage.local.set({
+    const methods = [];
+    if (interceptEstimateGasInput.checked) methods.push('eth_estimateGas');
+    if (interceptEthCallInput.checked) methods.push('eth_call');
+
+    const revertedOnly = interceptRevertedOnlyInput.checked;
+
+    const newSettings = {
         'tenderly_api_key': key,
         'tenderly_account_slug': account,
         'tenderly_project_slug': project,
-        'tenderly_chain_id': chainId
-    }, () => {
+        'tenderly_chain_id': chainId,
+        'intercept_methods': methods,
+        'intercept_reverted_only': revertedOnly
+    };
+
+    chrome.storage.local.set(newSettings, () => {
+        currentConfig = newSettings;
         saveStatus.style.display = 'block';
         setTimeout(() => saveStatus.style.display = 'none', 3000);
-        // Hide config after save
-        setTimeout(() => configSection.style.display = 'none', 1000);
+        
+        // If we just set the key, hide welcome screen
+        if (key) {
+            welcomeScreen.style.display = 'none';
+        }
     });
-});
+}
 
-chrome.devtools.network.onRequestFinished.addListener(async (request) => {
+function resetConfig() {
+    if (confirm('Are you sure you want to reset all settings to default?')) {
+        chrome.storage.local.clear(() => {
+            // Restore defaults for checkoxes visually or just reload
+            apiKeyInput.value = '';
+            accountSlugInput.value = '';
+            projectSlugInput.value = '';
+            chainIdInput.value = '';
+            interceptEstimateGasInput.checked = true;
+            interceptEthCallInput.checked = false;
+            interceptRevertedOnlyInput.checked = false;
+            
+            // Reload from storage (which is now empty) effectively resets logic
+            loadConfig(); 
+        });
+    }
+}
+
+// --- Request Handling ---
+
+async function handleRequest(request) {
     if (request.request.method !== 'POST') return;
     
+    // Check content type
     const contentTypeHeader = request.request.headers.find(h => h.name.toLowerCase() === 'content-type');
     if (!contentTypeHeader || !contentTypeHeader.value.includes('application/json')) {
         return;
@@ -70,20 +199,39 @@ chrome.devtools.network.onRequestFinished.addListener(async (request) => {
 
     if (!request.request.postData || !request.request.postData.text) return;
 
+    let requestBody;
     try {
-        const body = JSON.parse(request.request.postData.text);
-        let rpcRequest = Array.isArray(body) ? body[0] : body;
+        requestBody = JSON.parse(request.request.postData.text);
+    } catch (e) {
+        return; // Not JSON
+    }
 
-        if (rpcRequest.method === 'eth_estimateGas') {
-            addRequestToList(rpcRequest, request.request.url);
+    // Support batch requests? For now handle single or first of batch
+    const rpcRequest = Array.isArray(requestBody) ? requestBody[0] : requestBody;
+    if (!rpcRequest || !rpcRequest.method) return;
+
+    // Filter by Method
+    const allowedMethods = currentConfig.intercept_methods || ['eth_estimateGas'];
+    if (!allowedMethods.includes(rpcRequest.method)) return;
+
+    // Get Response Content to check for errors/reverts
+    request.getContent((content, encoding) => {
+        let rpcResponse = null;
+        try {
+            rpcResponse = JSON.parse(content);
+        } catch(e) {}
+        
+        // Filter Reverted Only
+        if (currentConfig.intercept_reverted_only) {
+            // If no error in response, ignore
+            if (!rpcResponse || !rpcResponse.error) return;
         }
 
-    } catch (e) {
-        // Not JSON
-    }
-});
+        addRequestToList(rpcRequest, rpcResponse, request.request.url);
+    });
+}
 
-function addRequestToList(rpcRequest, url) {
+function addRequestToList(rpcRequest, rpcResponse, url) {
     if (!hasRequests) {
         listElement.innerHTML = '';
         hasRequests = true;
@@ -95,7 +243,6 @@ function addRequestToList(rpcRequest, url) {
     const containerDiv = document.createElement('div');
     containerDiv.className = 'request-container';
     containerDiv.onclick = (e) => {
-        // Only toggle if not clicking interactive elements inside
         if (['BUTTON', 'A', 'INPUT'].includes(e.target.tagName)) return;
         item.classList.toggle('expanded');
     };
@@ -103,10 +250,34 @@ function addRequestToList(rpcRequest, url) {
     const infoDiv = document.createElement('div');
     infoDiv.className = 'request-info';
     
+    // Badge & Status Row
+    const badgeRow = document.createElement('div');
+    badgeRow.style.display = 'flex';
+    badgeRow.style.alignItems = 'center';
+    badgeRow.style.gap = '8px';
+
     const methodBadge = document.createElement('span');
     methodBadge.className = 'method-badge';
     methodBadge.textContent = rpcRequest.method;
     
+    badgeRow.appendChild(methodBadge);
+
+    // RPC Result Status
+    if (rpcResponse) {
+        const statusBadge = document.createElement('span');
+        statusBadge.style.fontSize = '11px';
+        statusBadge.style.fontWeight = '600';
+        
+        if (rpcResponse.error) {
+            statusBadge.style.color = 'var(--accent-error)';
+            statusBadge.textContent = 'Failed';
+        } else {
+            statusBadge.style.color = 'var(--accent-success)';
+            statusBadge.textContent = 'Success';
+        }
+        badgeRow.appendChild(statusBadge);
+    }
+
     const paramsPreview = document.createElement('span');
     paramsPreview.className = 'url-text';
     try {
@@ -114,13 +285,11 @@ function addRequestToList(rpcRequest, url) {
         paramsPreview.textContent = paramsStr;
     } catch(e) {}
 
-    infoDiv.appendChild(methodBadge);
+    infoDiv.appendChild(badgeRow);
     infoDiv.appendChild(paramsPreview);
 
     const actionContainer = document.createElement('div');
-    actionContainer.style.display = 'flex';
-    actionContainer.style.alignItems = 'center';
-    actionContainer.style.gap = '8px';
+    actionContainer.className = 'action-container';
 
     const btn = document.createElement('button');
     btn.className = 'btn-primary';
@@ -137,26 +306,45 @@ function addRequestToList(rpcRequest, url) {
     const detailsDiv = document.createElement('div');
     detailsDiv.className = 'request-details';
     
-    // Pretty print JSON
-    const pre = document.createElement('pre');
-    pre.style.margin = '0';
-    pre.textContent = JSON.stringify(rpcRequest, null, 2);
-    detailsDiv.appendChild(pre);
+    // Pretty print JSON (Request & Response)
+    const reqTitle = document.createElement('div');
+    reqTitle.textContent = "Request:";
+    reqTitle.style.fontWeight = 'bold';
+    reqTitle.style.marginBottom = '4px';
+    detailsDiv.appendChild(reqTitle);
+
+    const preReq = document.createElement('pre');
+    preReq.style.margin = '0 0 12px 0';
+    preReq.textContent = JSON.stringify(rpcRequest, null, 2);
+    detailsDiv.appendChild(preReq);
+
+    if (rpcResponse) {
+        const resTitle = document.createElement('div');
+        resTitle.textContent = "Response:";
+        resTitle.style.fontWeight = 'bold';
+        resTitle.style.marginBottom = '4px';
+        detailsDiv.appendChild(resTitle);
+
+        const preRes = document.createElement('pre');
+        preRes.style.margin = '0';
+        preRes.textContent = JSON.stringify(rpcResponse, null, 2);
+        detailsDiv.appendChild(preRes);
+    }
 
     item.appendChild(containerDiv);
     item.appendChild(detailsDiv);
 
-    // Prepend to list (newest first)
     listElement.insertBefore(item, listElement.firstChild);
 }
 
+// --- Simulation Logic ---
+
 async function simulateTransaction(rpcRequest, url, btn, container) {
-    // Get config
+    // Re-fetch config to be safe
     const config = await new Promise(resolve => chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug', 'tenderly_chain_id'], resolve));
     
     if (!config.tenderly_api_key || !config.tenderly_account_slug || !config.tenderly_project_slug) {
-        alert('Please configure API Key, Account Slug, and Project Slug first (click the settings icon).');
-        configSection.style.display = 'block';
+        alert('Configuration missing. Please check the Settings tab.');
         return;
     }
 
@@ -165,8 +353,25 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
     btn.disabled = true;
 
     try {
-        const txParams = rpcRequest.params[0];
-        const stateOverrides = rpcRequest.params[2];
+        let txParams, stateOverrides;
+
+        // Handle both eth_estimateGas and eth_call which usually share [tx, block/state] structure
+        // But for eth_call, the 2nd param is usually block tag.
+        
+        if (rpcRequest.params && rpcRequest.params.length > 0) {
+            txParams = rpcRequest.params[0];
+            
+            // Check for state overrides in varying positions depending on method/client
+            // Standard eth_estimateGas: [tx, block, stateOverrides] or [tx, stateOverrides] ?
+            // Actually geth: [call, block] or [call]
+            // We'll try to find an object that looks like state overrides if it exists
+            // For now, let's just stick to the previous index logic slightly guarded
+             if (rpcRequest.params.length >= 3) {
+                 stateOverrides = rpcRequest.params[2];
+             }
+        } else {
+             throw new Error("Invalid params");
+        }
 
         let networkId = config.tenderly_chain_id;
         if (!networkId) {
@@ -217,7 +422,7 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
              }));
         }
         
-        // 1. Execute Simulation
+        // Execute Simulation
         const response = await fetch(`https://api.tenderly.co/api/v1/account/${config.tenderly_account_slug}/project/${config.tenderly_project_slug}/simulate`, {
             method: 'POST',
             headers: {
@@ -236,7 +441,7 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
         const simulationId = data.simulation.id;
         const status = data.simulation.status; 
 
-        // 2. Share Simulation
+        // Share Simulation (make it public)
         try {
             await fetch(`https://api.tenderly.co/api/v1/account/${config.tenderly_account_slug}/project/${config.tenderly_project_slug}/simulations/${simulationId}/share`, {
                 method: 'POST',
@@ -288,12 +493,11 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
 async function detectNetwork(requestUrl) {
     if (!requestUrl) return '1';
     
+    // Attempt RPC call to get chainId
     try {
         const response = await fetch(requestUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 jsonrpc: '2.0',
                 method: 'eth_chainId',
@@ -302,23 +506,25 @@ async function detectNetwork(requestUrl) {
             })
         });
 
-        if (!response.ok) throw new Error('Fetch failed');
-        
-        const data = await response.json();
-        if (data.result) {
-            return parseInt(data.result, 16).toString();
+        if (response.ok) {
+            const data = await response.json();
+            if (data.result) {
+                return parseInt(data.result, 16).toString();
+            }
         }
     } catch (e) {
-        console.warn('Could not detect network via RPC, defaulting to mainnet', e);
+        console.warn('Network detection via RPC failed', e);
     }
     
-    // Fallback based on URL pattern if RPC fails, or just default to 1
     const lowerUrl = requestUrl.toLowerCase();
     
     if (lowerUrl.includes('sepolia')) return '11155111';
     if (lowerUrl.includes('holesky')) return '17000';
     if (lowerUrl.includes('goerli')) return '5'; 
-    if (lowerUrl.includes('mainnet') || lowerUrl.includes('eth')) return '1'; 
+    if (lowerUrl.includes('optimism') || lowerUrl.includes('opt')) return '10';
+    if (lowerUrl.includes('arbitrum') || lowerUrl.includes('arb')) return '42161';
+    if (lowerUrl.includes('polygon') || lowerUrl.includes('matic')) return '137';
+    if (lowerUrl.includes('base')) return '8453';
 
     return '1'; 
 }

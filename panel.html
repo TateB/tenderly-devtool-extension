@@ -11,50 +11,114 @@
 <body>
 
   <header>
-    <h1>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z"
-          fill="#7D69FF" />
-        <path d="M8 12H16M12 8V16" stroke="white" stroke-width="2" stroke-linecap="round" />
-      </svg>
-      Simulate Requests
-    </h1>
-    <button id="settings-toggle" class="icon-btn" title="Settings">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path
-          d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
-        </path>
-      </svg>
-    </button>
+    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+      <h1>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z"
+            fill="#7D69FF" />
+          <path d="M8 12H16M12 8V16" stroke="white" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        Simulate Requests
+      </h1>
+    </div>
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="requests">Requests</button>
+      <button class="tab-btn" data-tab="settings">Settings</button>
+    </div>
   </header>
 
-  <div id="config-section" style="display: none;">
-    <div class="input-group">
-      <input type="password" id="api-key" placeholder="Tenderly API Key">
+  <main>
+    <!-- Welcome Screen (Hidden by default) -->
+    <div id="welcome-screen" class="welcome-screen" style="display: none;">
+      <div class="welcome-icon">👋</div>
+      <h2 class="welcome-title">Welcome to Tenderly DevTools</h2>
+      <p class="welcome-text">
+        Inspect and simulate transactions directly from Chrome DevTools.
+        Configure your Tenderly project to get started.
+      </p>
+      <button id="get-started-btn" class="btn-primary">
+        Configure Extension
+      </button>
     </div>
-    <div class="input-row">
-      <input type="text" id="account-slug" placeholder="Account Slug">
-      <input type="text" id="project-slug" placeholder="Project Slug">
-    </div>
-    <div class="input-group">
-      <input type="text" id="chain-id-override" placeholder="Chain ID Override (Optional)">
-    </div>
-    <button id="save-config" class="btn-primary" style="width: 100%; margin-top: 12px;">
-      Save Configuration
-    </button>
-    <div id="save-status"
-      style="text-align: center; margin-top: 8px; font-size: 12px; color: var(--accent-success); display: none;">
-      Settings Saved Successfully
-    </div>
-  </div>
 
-  <main id="request-list">
-    <div class="empty-state">
-      <div class="empty-icon">📡</div>
-      <p>Listening for <code>eth_estimateGas</code> requests...</p>
-      <small>Requests will appear here as you browse.</small>
+    <!-- Requests Tab -->
+    <div id="tab-requests" class="tab-content active">
+      <div id="request-list">
+        <div class="empty-state">
+          <div class="empty-icon">📡</div>
+          <p>Listening for requests...</p>
+          <small>Trigger a transaction to see it here.</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="tab-settings" class="tab-content">
+
+      <div class="settings-section">
+        <div class="sub-tab-nav">
+          <button class="sub-tab-btn active" data-subtab="general">General</button>
+          <button class="sub-tab-btn" data-subtab="connection">Connection</button>
+          <button class="sub-tab-btn" data-subtab="network">Network</button>
+        </div>
+
+        <!-- General Sub Tab -->
+        <div id="subtab-general" class="sub-tab-content active">
+          <h3 class="settings-title">Behaviour</h3>
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="intercept-estimate-gas" checked>
+              Intercept <code>eth_estimateGas</code>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="intercept-eth-call">
+              Intercept <code>eth_call</code>
+            </label>
+            <div class="divider" style="margin: 12px 0;"></div>
+            <label class="checkbox-label">
+              <input type="checkbox" id="intercept-reverted-only">
+              Only intercept reverted calls
+            </label>
+          </div>
+        </div>
+
+        <!-- Connection Sub Tab -->
+        <div id="subtab-connection" class="sub-tab-content">
+          <h3 class="settings-title">Tenderly API</h3>
+          <div class="input-group">
+            <input type="password" id="api-key" placeholder="Tenderly API Key">
+          </div>
+          <div class="input-row">
+            <input type="text" id="account-slug" placeholder="Account Slug">
+            <input type="text" id="project-slug" placeholder="Project Slug">
+          </div>
+        </div>
+
+        <!-- Network Sub Tab -->
+        <div id="subtab-network" class="sub-tab-content">
+          <h3 class="settings-title">Network Overrides</h3>
+          <div class="input-group">
+            <input type="text" id="chain-id-override" placeholder="Chain ID Override (Optional)">
+          </div>
+        </div>
+
+      </div>
+
+      <div style="padding: 0 20px; display: flex; gap: 12px;">
+        <button id="save-config" class="btn-primary" style="flex: 1;">
+          Save Configuration
+        </button>
+        <button id="reset-config" class="icon-btn"
+          style="border: 1px solid var(--border-color); width: auto; padding: 0 16px;" title="Reset to Defaults">
+          Reset
+        </button>
+      </div>
+
+      <div id="save-status"
+        style="text-align: center; margin-top: 12px; font-size: 12px; color: var(--accent-success); display: none;">
+        Settings Saved Successfully
+      </div>
+
     </div>
   </main>
 
