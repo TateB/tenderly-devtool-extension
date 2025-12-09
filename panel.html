@@ -18,7 +18,7 @@
     <!-- Top Header -->
     <header class="app-header">
       <div class="brand">
-        <svg class="brand-icon" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        <svg class="brand-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
           xmlns="http://www.w3.org/2000/svg">
           <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z"
             fill="var(--primary-color)" />
@@ -27,10 +27,13 @@
         <span>Tenderly DevTools</span>
       </div>
 
-      <div class="nav-tabs">
-        <button id="nav-requests" class="nav-tab active">Requests</button>
-        <button id="nav-settings" class="nav-tab">Settings</button>
-      </div>
+      <button id="nav-settings" class="icon-btn" title="Settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M19.14 12.936C19.19 12.636 19.23 12.316 19.23 12.006C19.23 11.686 19.19 11.376 19.14 11.066L21.16 9.38605C21.34 9.23605 21.39 8.97605 21.27 8.76605L19.36 5.45605C19.24 5.24605 18.99 5.16605 18.77 5.24605L16.3 6.23605C15.79 5.84605 15.23 5.51605 14.62 5.26605L14.24 2.63605C14.2 2.39605 13.99 2.22605 13.75 2.22605H9.93002C9.69002 2.22605 9.48002 2.39605 9.44002 2.62605L9.06002 5.25605C8.45002 5.50605 7.89002 5.83605 7.37002 6.23605L4.92002 5.23605C4.70002 5.14605 4.45002 5.23605 4.33002 5.44605L2.42002 8.75605C2.30002 8.96605 2.35002 9.22605 2.53002 9.37605L4.55002 11.0561C4.50002 11.3661 4.46002 11.6861 4.46002 12.0061C4.46002 12.3161 4.50002 12.6361 4.55002 12.9461L2.53002 14.6261C2.35002 14.7761 2.30002 15.0361 2.42002 15.2461L4.33002 18.5561C4.45002 18.7661 4.70002 18.8461 4.92002 18.7661L7.39002 17.7761C7.89002 18.1661 8.45002 18.4961 9.06002 18.7461L9.44002 21.3761C9.48002 21.6061 9.69002 21.7761 9.93002 21.7761H13.75C13.99 21.7761 14.2 21.6061 14.24 21.3661L14.62 18.7361C15.23 18.4961 15.79 18.1661 16.3 17.7661L18.77 18.7561C18.99 18.8361 19.24 18.7561 19.36 18.5461L21.27 15.2361C21.39 15.0261 21.34 14.7661 21.16 14.6161L19.14 12.936ZM11.84 15.0061C10.19 15.0061 8.84002 13.6661 8.84002 12.0061C8.84002 10.3461 10.19 9.00605 11.84 9.00605C13.49 9.00605 14.84 10.3461 14.84 12.0061C14.84 13.6661 13.49 15.0061 11.84 15.0061Z"
+            fill="currentColor" />
+        </svg>
+      </button>
     </header>
 
     <!-- Split View Layout (request list + details) -->
@@ -100,7 +103,16 @@
     <div id="settings-view" class="settings-view" style="display: none;">
       <div class="settings-container">
         <div class="settings-header-page">
-          <h2 style="font-size: 20px;">Settings</h2>
+          <button id="close-settings" class="btn btn-back">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M19 12H5" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" />
+              <path d="M12 19L5 12L12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg>
+            Back
+          </button>
+          <h2 style="font-size: 18px;">Settings</h2>
         </div>
 
         <div class="settings-body-page">

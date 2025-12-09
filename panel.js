@@ -9,8 +9,7 @@ const welcomeScreen = document.getElementById('welcome-screen');
 // Settings View
 const settingsView = document.getElementById('settings-view');
 const navSettingsBtn = document.getElementById('nav-settings');
-const navRequestsBtn = document.getElementById('nav-requests');
-// const closeSettingsBtn = document.getElementById('close-settings'); // Removed in new layout
+const closeSettingsBtn = document.getElementById('close-settings');
 const saveStatus = document.getElementById('save-status');
 
 // Welcome Actions
@@ -64,8 +63,8 @@ function setupEventListeners() {
         });
     }
 
-    if (navRequestsBtn) {
-        navRequestsBtn.addEventListener('click', () => {
+    if (closeSettingsBtn) {
+        closeSettingsBtn.addEventListener('click', () => {
             switchTab(TABS.REQUESTS);
         });
     }
@@ -89,26 +88,20 @@ function setupEventListeners() {
 
 function switchTab(tabName) {
     activeTab = tabName;
-    updateNavState();
+    // updateNavState(); // Removed as we no longer have tabs
     
     if (tabName === TABS.SETTINGS) {
         loadConfig(); // Refresh config values when entering
         if (splitView) splitView.style.display = 'none';
         if (settingsView) settingsView.style.display = 'flex';
+        // Hide settings button when in settings
+        if (navSettingsBtn) navSettingsBtn.style.display = 'none';
     } else {
         if (settingsView) settingsView.style.display = 'none';
         if (splitView) splitView.style.display = 'flex';
+        // Show settings button when in requests
+        if (navSettingsBtn) navSettingsBtn.style.display = 'flex';
         updateViewState(); // Ensure correct detail/welcome/placeholder is shown
-    }
-}
-
-function updateNavState() {
-    if (activeTab === TABS.SETTINGS) {
-        if (navSettingsBtn) navSettingsBtn.classList.add('active');
-        if (navRequestsBtn) navRequestsBtn.classList.remove('active');
-    } else {
-        if (navRequestsBtn) navRequestsBtn.classList.add('active');
-        if (navSettingsBtn) navSettingsBtn.classList.remove('active');
     }
 }
 
