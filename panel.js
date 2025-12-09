@@ -1,13 +1,29 @@
-
 // DOM Elements
+const splitView = document.getElementById('split-view');
 const listElement = document.getElementById('request-list');
+const detailContainer = document.getElementById('detaill-container');
+const detailPlaceholder = document.getElementById('detail-placeholder');
+const detailView = document.getElementById('detail-view');
+const welcomeScreen = document.getElementById('welcome-screen');
+
+// Settings View
+const settingsView = document.getElementById('settings-view');
+const navSettingsBtn = document.getElementById('nav-settings');
+const navRequestsBtn = document.getElementById('nav-requests');
+// const closeSettingsBtn = document.getElementById('close-settings'); // Removed in new layout
 const saveStatus = document.getElementById('save-status');
 
-// Tabs
-const tabButtons = document.querySelectorAll('.tab-btn');
-const tabContents = document.querySelectorAll('.tab-content');
-const welcomeScreen = document.getElementById('welcome-screen');
-const getStartedBtn = document.getElementById('get-started-btn');
+// Welcome Actions
+const btnOpenSettingsWelcome = document.getElementById('btn-open-settings-welcome');
+
+// Detail View Elements
+const detailMethod = document.getElementById('detail-method');
+const detailUrl = document.getElementById('detail-url');
+const detailRequestCode = document.getElementById('detail-request-code');
+const detailResponseCode = document.getElementById('detail-response-code');
+const detailStatusIndicator = document.getElementById('detail-status-indicator');
+const simulateBtn = document.getElementById('simulate-btn');
+const simulationResultContainer = document.getElementById('simulation-result-container');
 
 // Config Inputs
 const apiKeyInput = document.getElementById('api-key');
@@ -22,79 +38,78 @@ const interceptEthCallInput = document.getElementById('intercept-eth-call');
 const interceptRevertedOnlyInput = document.getElementById('intercept-reverted-only');
 
 // State
-let hasRequests = false;
+let requests = []; // Store requests to easy access for details
 let currentConfig = {};
+let selectedRequestId = null;
+const TABS = {
+    REQUESTS: 'requests',
+    SETTINGS: 'settings'
+};
+let activeTab = TABS.REQUESTS;
 
 // --- Initialization ---
 
 init();
 
 function init() {
-    setupTabs();
     loadConfig();
     setupEventListeners();
 }
 
-function setupTabs() {
-    tabButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tabName = btn.dataset.tab;
-            
-            // Update Buttons
-            tabButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            
-            // Update Content
-            tabContents.forEach(c => {
-                c.classList.remove('active');
-                if (c.id === `tab-${tabName}`) c.classList.add('active');
-            });
-        });
-    });
-
-    // Sub-Tabs Logic
-    function initSubTabs() {
-        const subTabButtons = document.querySelectorAll('.sub-tab-btn');
-        const subTabContents = document.querySelectorAll('.sub-tab-content');
-
-        if (!subTabButtons.length) return;
-
-        subTabButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const subTabName = btn.dataset.subtab;
-                
-                // Update Buttons
-                subTabButtons.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                
-                // Update Content
-                subTabContents.forEach(c => {
-                    c.classList.remove('active');
-                    if (c.id === `subtab-${subTabName}`) c.classList.add('active');
-                });
-            });
+function setupEventListeners() {
+    // Navigation
+    if (navSettingsBtn) {
+        navSettingsBtn.addEventListener('click', () => {
+            switchTab(TABS.SETTINGS);
         });
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initSubTabs);
-    } else {
-        initSubTabs();
+    if (navRequestsBtn) {
+        navRequestsBtn.addEventListener('click', () => {
+            switchTab(TABS.REQUESTS);
+        });
     }
 
-    getStartedBtn.addEventListener('click', () => {
-        welcomeScreen.style.display = 'none';
-        const settingsTabBtn = document.querySelector('[data-tab="settings"]');
-        if (settingsTabBtn) settingsTabBtn.click();
-    });
+    // Welcome Screen Action
+    if (btnOpenSettingsWelcome) {
+        btnOpenSettingsWelcome.addEventListener('click', () => {
+            switchTab(TABS.SETTINGS);
+        });
+    }
+
+    // Config Actions
+    if (saveBtn) saveBtn.addEventListener('click', saveConfig);
+    if (resetBtn) resetBtn.addEventListener('click', resetConfig);
+
+    // Listen for network requests
+    if (chrome.devtools && chrome.devtools.network) {
+        chrome.devtools.network.onRequestFinished.addListener(handleRequest);
+    }
 }
 
-function setupEventListeners() {
-    saveBtn.addEventListener('click', saveConfig);
-    resetBtn.addEventListener('click', resetConfig);
+function switchTab(tabName) {
+    activeTab = tabName;
+    updateNavState();
     
-    // Listen for network refquests
-    chrome.devtools.network.onRequestFinished.addListener(handleRequest);
+    if (tabName === TABS.SETTINGS) {
+        loadConfig(); // Refresh config values when entering
+        if (splitView) splitView.style.display = 'none';
+        if (settingsView) settingsView.style.display = 'flex';
+    } else {
+        if (settingsView) settingsView.style.display = 'none';
+        if (splitView) splitView.style.display = 'flex';
+        updateViewState(); // Ensure correct detail/welcome/placeholder is shown
+    }
+}
+
+function updateNavState() {
+    if (activeTab === TABS.SETTINGS) {
+        if (navSettingsBtn) navSettingsBtn.classList.add('active');
+        if (navRequestsBtn) navRequestsBtn.classList.remove('active');
+    } else {
+        if (navRequestsBtn) navRequestsBtn.classList.add('active');
+        if (navSettingsBtn) navSettingsBtn.classList.remove('active');
+    }
 }
 
 // --- Configuration ---
@@ -113,26 +128,45 @@ function loadConfig() {
         currentConfig = result;
 
         // Populate Inputs
-        if (result.tenderly_api_key) apiKeyInput.value = result.tenderly_api_key;
-        if (result.tenderly_account_slug) accountSlugInput.value = result.tenderly_account_slug;
-        if (result.tenderly_project_slug) projectSlugInput.value = result.tenderly_project_slug;
-        if (result.tenderly_chain_id) chainIdInput.value = result.tenderly_chain_id;
+        if (apiKeyInput) apiKeyInput.value = result.tenderly_api_key || '';
+        if (accountSlugInput) accountSlugInput.value = result.tenderly_account_slug || '';
+        if (projectSlugInput) projectSlugInput.value = result.tenderly_project_slug || '';
+        if (chainIdInput) chainIdInput.value = result.tenderly_chain_id || '';
 
         // Checkboxes
-        // Default to estimateGas if undefined
         const methods = result.intercept_methods || ['eth_estimateGas']; 
-        interceptEstimateGasInput.checked = methods.includes('eth_estimateGas');
-        interceptEthCallInput.checked = methods.includes('eth_call');
+        if (interceptEstimateGasInput) interceptEstimateGasInput.checked = methods.includes('eth_estimateGas');
+        if (interceptEthCallInput) interceptEthCallInput.checked = methods.includes('eth_call');
         
-        interceptRevertedOnlyInput.checked = !!result.intercept_reverted_only;
-
-        // Show Welcome Screen if no API key
-        if (!result.tenderly_api_key) {
-            welcomeScreen.style.display = 'flex';
-        } else {
-            welcomeScreen.style.display = 'none';
-        }
+        if (interceptRevertedOnlyInput) interceptRevertedOnlyInput.checked = !!result.intercept_reverted_only;
+        
+        // Update View State (Welcome/Placeholder/Detail)
+        updateViewState();
     });
+}
+
+function updateViewState() {
+    // Only affects Split View content
+    const hasConfig = currentConfig.tenderly_api_key && currentConfig.tenderly_account_slug && currentConfig.tenderly_project_slug;
+    
+    if (!hasConfig) {
+        // Show Welcome, Hide others
+        if (welcomeScreen) welcomeScreen.style.display = 'flex';
+        if (detailPlaceholder) detailPlaceholder.style.display = 'none';
+        if (detailView) detailView.style.display = 'none';
+    } else {
+        // HIDE Welcome
+        if (welcomeScreen) welcomeScreen.style.display = 'none';
+        
+        // If nothing selected, show placeholder, else show detail
+        if (selectedRequestId) {
+             if (detailPlaceholder) detailPlaceholder.style.display = 'none';
+             if (detailView) detailView.style.display = 'flex';
+        } else {
+             if (detailPlaceholder) detailPlaceholder.style.display = 'flex';
+             if (detailView) detailView.style.display = 'none';
+        }
+    }
 }
 
 function saveConfig() {
@@ -158,12 +192,14 @@ function saveConfig() {
 
     chrome.storage.local.set(newSettings, () => {
         currentConfig = newSettings;
-        saveStatus.style.display = 'block';
-        setTimeout(() => saveStatus.style.display = 'none', 3000);
+        // Don't auto-switch; user might want to stay in settings.
+        // Just show success.
         
-        // If we just set the key, hide welcome screen
-        if (key) {
-            welcomeScreen.style.display = 'none';
+        if (saveStatus) {
+            saveStatus.style.opacity = '1';
+            setTimeout(() => {
+                saveStatus.style.opacity = '0';
+            }, 2000);
         }
     });
 }
@@ -171,16 +207,15 @@ function saveConfig() {
 function resetConfig() {
     if (confirm('Are you sure you want to reset all settings to default?')) {
         chrome.storage.local.clear(() => {
-            // Restore defaults for checkoxes visually or just reload
-            apiKeyInput.value = '';
-            accountSlugInput.value = '';
-            projectSlugInput.value = '';
-            chainIdInput.value = '';
-            interceptEstimateGasInput.checked = true;
-            interceptEthCallInput.checked = false;
-            interceptRevertedOnlyInput.checked = false;
+            if(apiKeyInput) apiKeyInput.value = '';
+            if(accountSlugInput) accountSlugInput.value = '';
+            if(projectSlugInput) projectSlugInput.value = '';
+            if(chainIdInput) chainIdInput.value = '';
+            if(interceptEstimateGasInput) interceptEstimateGasInput.checked = true;
+            if(interceptEthCallInput) interceptEthCallInput.checked = false;
+            if(interceptRevertedOnlyInput) interceptRevertedOnlyInput.checked = false;
             
-            // Reload from storage (which is now empty) effectively resets logic
+            // Reload logic
             loadConfig(); 
         });
     }
@@ -203,10 +238,9 @@ async function handleRequest(request) {
     try {
         requestBody = JSON.parse(request.request.postData.text);
     } catch (e) {
-        return; // Not JSON
+        return; 
     }
 
-    // Support batch requests? For now handle single or first of batch
     const rpcRequest = Array.isArray(requestBody) ? requestBody[0] : requestBody;
     if (!rpcRequest || !rpcRequest.method) return;
 
@@ -223,149 +257,134 @@ async function handleRequest(request) {
         
         // Filter Reverted Only
         if (currentConfig.intercept_reverted_only) {
-            // If no error in response, ignore
             if (!rpcResponse || !rpcResponse.error) return;
         }
 
-        addRequestToList(rpcRequest, rpcResponse, request.request.url);
+        const reqId = Date.now() + Math.random().toString();
+        const reqData = {
+            id: reqId,
+            timestamp: new Date(),
+            url: request.request.url,
+            rpcRequest,
+            rpcResponse
+        };
+        
+        requests.push(reqData);
+        addRequestToList(reqData);
     });
 }
 
-function addRequestToList(rpcRequest, rpcResponse, url) {
-    if (!hasRequests) {
-        listElement.innerHTML = '';
-        hasRequests = true;
-    }
+function addRequestToList(reqData) {
+    // Remove empty state if present
+    const emptyState = listElement.querySelector('.empty-state');
+    if (emptyState) emptyState.remove();
 
-    const item = document.createElement('li');
+    const item = document.createElement('div');
     item.className = 'request-item';
-
-    const containerDiv = document.createElement('div');
-    containerDiv.className = 'request-container';
-    containerDiv.onclick = (e) => {
-        if (['BUTTON', 'A', 'INPUT'].includes(e.target.tagName)) return;
-        item.classList.toggle('expanded');
-    };
-
-    const infoDiv = document.createElement('div');
-    infoDiv.className = 'request-info';
+    item.dataset.id = reqData.id;
+    item.role = 'button'; 
+    item.tabIndex = 0;
     
-    // Badge & Status Row
-    const badgeRow = document.createElement('div');
-    badgeRow.style.display = 'flex';
-    badgeRow.style.alignItems = 'center';
-    badgeRow.style.gap = '8px';
-
-    const methodBadge = document.createElement('span');
-    methodBadge.className = 'method-badge';
-    methodBadge.textContent = rpcRequest.method;
+    const isError = reqData.rpcResponse && reqData.rpcResponse.error;
+    const statusClass = isError ? 'error' : 'success';
     
-    badgeRow.appendChild(methodBadge);
+    const timeStr = reqData.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    // RPC Result Status
-    if (rpcResponse) {
-        const statusBadge = document.createElement('span');
-        statusBadge.style.fontSize = '11px';
-        statusBadge.style.fontWeight = '600';
-        
-        if (rpcResponse.error) {
-            statusBadge.style.color = 'var(--accent-error)';
-            statusBadge.textContent = 'Failed';
-        } else {
-            statusBadge.style.color = 'var(--accent-success)';
-            statusBadge.textContent = 'Success';
+    item.innerHTML = `
+        <div class="req-header">
+            <span class="method-tag">${reqData.rpcRequest.method}</span>
+            <span class="status-indicator ${statusClass}"></span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; width: 100%;">
+             <div class="req-summary">${reqData.rpcRequest.params ? JSON.stringify(reqData.rpcRequest.params).substring(0, 30) : '[]'}...</div>
+             <div class="req-time">${timeStr}</div>
+        </div>
+    `;
+
+    item.onclick = () => selectRequest(reqData.id);
+    item.onkeydown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            selectRequest(reqData.id);
         }
-        badgeRow.appendChild(statusBadge);
-    }
-
-    const paramsPreview = document.createElement('span');
-    paramsPreview.className = 'url-text';
-    try {
-        const paramsStr = JSON.stringify(rpcRequest.params);
-        paramsPreview.textContent = paramsStr;
-    } catch(e) {}
-
-    infoDiv.appendChild(badgeRow);
-    infoDiv.appendChild(paramsPreview);
-
-    const actionContainer = document.createElement('div');
-    actionContainer.className = 'action-container';
-
-    const btn = document.createElement('button');
-    btn.className = 'btn-primary';
-    btn.innerHTML = '<span>Simulate</span>';
-    btn.onclick = async (e) => {
-        e.stopPropagation();
-        await simulateTransaction(rpcRequest, url, btn, actionContainer);
     };
 
-    actionContainer.appendChild(btn);
-    containerDiv.appendChild(infoDiv);
-    containerDiv.appendChild(actionContainer);
+    // Prepend to list
+    if (listElement) listElement.insertBefore(item, listElement.firstChild);
 
-    const detailsDiv = document.createElement('div');
-    detailsDiv.className = 'request-details';
+    // Auto-select if first AND we are not in Welcome Mode (which shouldn't happen if we have requests receiving, but logic should handle)
+    const hasConfig = currentConfig.tenderly_api_key && currentConfig.tenderly_account_slug;
+    if (requests.length === 1 && hasConfig) {
+        selectRequest(reqData.id);
+    }
+}
+
+function selectRequest(id) {
+    selectedRequestId = id;
+    const reqData = requests.find(r => r.id === id);
+    if (!reqData) return;
+
+    // View State Update handled by updateViewState if we were switching contexts, but here we assume detail is accessible
+    // Update List Selection
+    document.querySelectorAll('.request-item').forEach(el => el.classList.remove('active'));
+    const itemEl = document.querySelector(`.request-item[data-id="${id}"]`);
+    if (itemEl) itemEl.classList.add('active');
+
+    updateViewState(); // Ensure correct container shown
+
+    if (detailMethod) detailMethod.textContent = reqData.rpcRequest.method;
+    if (detailUrl) detailUrl.textContent = reqData.url;
     
-    // Pretty print JSON (Request & Response)
-    const reqTitle = document.createElement('div');
-    reqTitle.textContent = "Request:";
-    reqTitle.style.fontWeight = 'bold';
-    reqTitle.style.marginBottom = '4px';
-    detailsDiv.appendChild(reqTitle);
-
-    const preReq = document.createElement('pre');
-    preReq.style.margin = '0 0 12px 0';
-    preReq.textContent = JSON.stringify(rpcRequest, null, 2);
-    detailsDiv.appendChild(preReq);
-
-    if (rpcResponse) {
-        const resTitle = document.createElement('div');
-        resTitle.textContent = "Response:";
-        resTitle.style.fontWeight = 'bold';
-        resTitle.style.marginBottom = '4px';
-        detailsDiv.appendChild(resTitle);
-
-        const preRes = document.createElement('pre');
-        preRes.style.margin = '0';
-        preRes.textContent = JSON.stringify(rpcResponse, null, 2);
-        detailsDiv.appendChild(preRes);
+    // Status Indicator Description
+    const isError = reqData.rpcResponse && reqData.rpcResponse.error;
+    if (detailStatusIndicator) {
+         detailStatusIndicator.className = 'status-indicator ' + (isError ? 'error' : 'success');
+         detailStatusIndicator.title = isError ? 'Request Failed' : 'Request Successful';
     }
 
-    item.appendChild(containerDiv);
-    item.appendChild(detailsDiv);
+    if (detailRequestCode) detailRequestCode.textContent = JSON.stringify(reqData.rpcRequest, null, 2);
+    if (detailResponseCode) detailResponseCode.textContent = reqData.rpcResponse ? JSON.stringify(reqData.rpcResponse, null, 2) : 'No Response';
 
-    listElement.insertBefore(item, listElement.firstChild);
+    // Reset Result Container
+    if (simulationResultContainer) simulationResultContainer.innerHTML = '';
+
+    // Reset Button
+    if (simulateBtn) {
+        simulateBtn.disabled = false;
+        simulateBtn.style.background = ''; // reset to default css
+        simulateBtn.innerHTML = '<span>Simulate Transaction</span>';
+        
+        // Wire up Simulate Button
+        simulateBtn.onclick = () => performSimulation(reqData);
+    }
 }
 
 // --- Simulation Logic ---
 
-async function simulateTransaction(rpcRequest, url, btn, container) {
-    // Re-fetch config to be safe
+async function performSimulation(reqData) {
+    const btn = simulateBtn;
+    const resultContainer = simulationResultContainer;
+    
+    // Check config
     const config = await new Promise(resolve => chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug', 'tenderly_chain_id'], resolve));
     
     if (!config.tenderly_api_key || !config.tenderly_account_slug || !config.tenderly_project_slug) {
-        alert('Configuration missing. Please check the Settings tab.');
+        alert('Configuration missing. Please check Settings.');
+        if (settingsOverlay) settingsOverlay.classList.add('visible');
+        updateNavState('settings');
         return;
     }
 
+    const { rpcRequest, url } = reqData;
     const originalText = btn.innerHTML;
     btn.innerHTML = '<span>Simulating...</span>';
     btn.disabled = true;
+    if (resultContainer) resultContainer.innerHTML = '';
 
     try {
         let txParams, stateOverrides;
 
-        // Handle both eth_estimateGas and eth_call which usually share [tx, block/state] structure
-        // But for eth_call, the 2nd param is usually block tag.
-        
         if (rpcRequest.params && rpcRequest.params.length > 0) {
             txParams = rpcRequest.params[0];
-            
-            // Check for state overrides in varying positions depending on method/client
-            // Standard eth_estimateGas: [tx, block, stateOverrides] or [tx, stateOverrides] ?
-            // Actually geth: [call, block] or [call]
-            // We'll try to find an object that looks like state overrides if it exists
-            // For now, let's just stick to the previous index logic slightly guarded
              if (rpcRequest.params.length >= 3) {
                  stateOverrides = rpcRequest.params[2];
              }
@@ -378,7 +397,6 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
              networkId = await detectNetwork(url);
         }
 
-        // Map params to Renderly Simulation structure
         const simulationBody = {
             network_id: networkId,
             from: txParams.from || '0x0000000000000000000000000000000000000000',
@@ -392,29 +410,18 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
         if (txParams.gas) simulationBody.gas = parseInt(txParams.gas, 16);
         if (txParams.gasPrice) simulationBody.gas_price = BigInt(txParams.gasPrice).toString();
         
-        // State Overrides mapping
         if (stateOverrides) {
              simulationBody.state_objects = {};
              for (const [address, override] of Object.entries(stateOverrides)) {
                  simulationBody.state_objects[address] = {};
-                 if (override.balance) {
-                     simulationBody.state_objects[address].balance = BigInt(override.balance).toString();
-                 }
-                 if (override.nonce) {
-                      simulationBody.state_objects[address].nonce = parseInt(override.nonce, 16);
-                 }
-                 if (override.code) {
-                      simulationBody.state_objects[address].code = override.code;
-                 }
-                 if (override.stateDiff) {
-                     simulationBody.state_objects[address].storage = override.stateDiff;
-                 } else if (override.state) {
-                     simulationBody.state_objects[address].storage = override.state;
-                 }
+                 if (override.balance) simulationBody.state_objects[address].balance = BigInt(override.balance).toString();
+                 if (override.nonce) simulationBody.state_objects[address].nonce = parseInt(override.nonce, 16);
+                 if (override.code) simulationBody.state_objects[address].code = override.code;
+                 if (override.stateDiff) simulationBody.state_objects[address].storage = override.stateDiff;
+                 else if (override.state) simulationBody.state_objects[address].storage = override.state;
              }
         }
         
-        // Support Access List
         if (txParams.accessList) {
              simulationBody.access_list = txParams.accessList.map(item => ({
                  address: item.address,
@@ -422,7 +429,6 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
              }));
         }
         
-        // Execute Simulation
         const response = await fetch(`https://api.tenderly.co/api/v1/account/${config.tenderly_account_slug}/project/${config.tenderly_project_slug}/simulate`, {
             method: 'POST',
             headers: {
@@ -439,9 +445,9 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
 
         const data = await response.json();
         const simulationId = data.simulation.id;
-        const status = data.simulation.status; 
-
-        // Share Simulation (make it public)
+        const simStatus = data.simulation.status; // boolean usually
+        
+        // Share Simulation
         try {
             await fetch(`https://api.tenderly.co/api/v1/account/${config.tenderly_account_slug}/project/${config.tenderly_project_slug}/simulations/${simulationId}/share`, {
                 method: 'POST',
@@ -454,38 +460,34 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
             console.warn('Share failed', shareErr);
         }
 
-        // Update UI
-        btn.style.display = 'none'; // Hide button
-
-        // Status Indicator
-        const statusSpan = document.createElement('span');
-        if (status === true) {
-            statusSpan.className = 'status-success';
-            statusSpan.innerHTML = '<span>Success</span>';
-        } else {
-            statusSpan.className = 'status-error';
-            statusSpan.innerHTML = '<span>Reverted</span>';
+        // Success State
+        btn.innerHTML = '<span>View Simulation</span>';
+        btn.disabled = false;
+        btn.onclick = () => {
+             window.open(`https://www.tdly.co/shared/simulation/${simulationId}`, '_blank');
+        };
+        
+        // Render Result Badge
+        if (resultContainer) {
+            const statusText = simStatus ? 'Success' : 'Reverted';
+            const statusClass = simStatus ? 'success' : 'error';
+            resultContainer.innerHTML = `<span class="sim-badge ${statusClass}">${statusText}</span>`;
         }
-        
-        const link = document.createElement('a');
-        link.className = 'link-external';
-        link.textContent = 'View →';
-        link.href = `https://www.tdly.co/shared/simulation/${simulationId}`;
-        link.target = '_blank';
-        
-        container.appendChild(statusSpan);
-        container.appendChild(link);
 
     } catch (err) {
         console.error(err);
         btn.innerHTML = '<span>Error</span>';
-        btn.title = err.message;
-        btn.style.backgroundColor = 'var(--accent-error)';
+        btn.style.background = 'var(--accent-error)';
+        
+        if (resultContainer) {
+            resultContainer.innerHTML = `<span class="sim-badge error">Failed</span>`;
+        }
         
         setTimeout(() => {
             btn.innerHTML = originalText;
             btn.disabled = false;
-            btn.style.backgroundColor = '';
+            btn.style.background = '';
+            btn.onclick = () => performSimulation(reqData);
         }, 3000);
     }
 }
@@ -493,7 +495,6 @@ async function simulateTransaction(rpcRequest, url, btn, container) {
 async function detectNetwork(requestUrl) {
     if (!requestUrl) return '1';
     
-    // Attempt RPC call to get chainId
     try {
         const response = await fetch(requestUrl, {
             method: 'POST',
