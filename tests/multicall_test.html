@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Multicall Tests</title>
+</head>
+
+<body>
+  <h1>Multicall Tests</h1>
+  <div id="results"></div>
+
+  <script src="../multicall.js"></script>
+  <script>
+    const resultsDiv = document.getElementById('results')
+
+    function log(msg, success) {
+      const div = document.createElement('div')
+      div.textContent = msg
+      div.style.color = success ? 'green' : 'red'
+      resultsDiv.appendChild(div)
+    }
+
+    function assert(condition, msg) {
+      if (condition) {
+        log('PASS: ' + msg, true)
+      } else {
+        log('FAIL: ' + msg, false)
+        console.error('FAIL:', msg)
+      }
+    }
+
+    function runTests() {
+      // Test detection
+      assert(MulticallDecoder.isMulticall('0xcA11bde05977b3631167028862bE2a173976cA11', '0x82ad56cb0000'), 'Detects correct address and selector')
+      assert(!MulticallDecoder.isMulticall('0x123', '0x82ad56cb'), 'Rejects wrong address')
+      assert(!MulticallDecoder.isMulticall('0xcA11bde05977b3631167028862bE2a173976cA11', '0x12345678'), 'Rejects wrong selector')
+
+      // Test Decoding Aggregate3
+      // aggregate3(Call3[] calls)
+      // Call3: { target, allowFailure, callData }
+      // Let's manually construct a simple 1-item array encoding.
+      // selector: 82ad56cb
+      // offset to array: 00...20
+      // length: 1
+      // item 0 offset: 00...20 (relative to array start 20 -> 40)
+      // Call3 struct:
+      //   target: A pad 32
+      //   allowFailure: 1 pad 32
+      //   callDataOffset: 60 (96) relative to struct start
+      //   callData content at 96:
+      //     length: 4 (selector)
+      //     data: 12345678 (pad right)
+
+      // Layout:
+      // 00: 0000000000000000000000000000000000000000000000000000000000000020 (Array Offset)
+      // 20: 0000000000000000000000000000000000000000000000000000000000000001 (Length)
+      // 40: 0000000000000000000000000000000000000000000000000000000000000020 (Item 0 Offset -> relative to 20? No, relative to 20 which is start of array payload?)
+      //     Warning: "The elements of the array are encoded as... offset... relative to the start of the array data area (i.e. where length is located)."
+      //     So if array payload is at 20. Length is at 20.
+      //     Offset 20 means 20+20=40. Correct.
+
+      // 60: Struct Start (Address A)
+      //     000000000000000000000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (Target)
+      // 80: 0000000000000000000000000000000000000000000000000000000000000001 (AllowFailure)
+      // A0: 0000000000000000000000000000000000000000000000000000000000000060 (CallData Offset -> relative to 60. 60+60=C0. 192)
+
+      // C0: CallData Payload
+      //     0000000000000000000000000000000000000000000000000000000000000004 (Bytes Length)
+      // E0: 1234567800000000000000000000000000000000000000000000000000000000 (Bytes Data)
+
+      let p = ""
+      p += "82ad56cb" // Selector
+      p += "0".repeat(62) + "20" // Array Offset (32)
+
+      // Array data starts at 32
+      p += "0".repeat(63) + "1" // Length
+      p += "0".repeat(62) + "40" // Item 0 Offset (64, rel to 32 -> 96)
+
+      // Struct at 96
+      p += "0".repeat(24) + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // Target @ 96
+      p += "0".repeat(63) + "1" // AllowFailure @ 128
+      p += "0".repeat(62) + "60" // CallData Offset (96, rel to 96 -> 192) @ 160
+
+      // Data at 192
+      p += "0".repeat(63) + "4" // Bytes Length @ 192
+      p += "12345678" + "0".repeat(56) // Bytes Data @ 224
+
+      const decoded = MulticallDecoder.decode("0x" + p)
+      console.log('Decoded:', decoded)
+
+      assert(decoded.length === 1, 'Decoded length is 1')
+      assert(decoded[0].target === '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'Target matches')
+      assert(decoded[0].allowFailure === true, 'AllowFailure matches')
+      assert(decoded[0].callData === '0x12345678', 'CallData matches')
+    }
+
+    try {
+      runTests()
+    } catch (e) {
+      log('EXCEPTION: ' + e.message, false)
+      console.error(e)
+    }
+  </script>
+</body>
+
+</html>

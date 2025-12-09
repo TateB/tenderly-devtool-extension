@@ -717,3 +717,84 @@ input[type="checkbox"] {
   filter: grayscale(1);
   margin-bottom: 8px;
 }
+
+/* Multicall List */
+.multicall-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.sub-req-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sub-req-item:hover {
+  border-color: var(--primary-color);
+  background: var(--surface-active);
+}
+
+/* Sidebar Tree View */
+.request-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.sub-request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.request-item.sub-item {
+  margin-left: 20px;
+  /* Indent */
+  padding-left: 12px;
+  border-left: 1px solid var(--border-color);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  width: auto;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.request-item.sub-item:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-color);
+  /* Don't highlight border fully */
+}
+
+.request-item.sub-item.active {
+  background: var(--surface-active);
+  box-shadow: none;
+  border-left: 2px solid var(--primary-color);
+}
+
+.request-item.sub-item.active::before {
+  display: none;
+  /* Remove big left border */
+}
+
+.expand-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+  cursor: pointer;
+}
+
+.expand-icon:hover {
+  color: var(--text-main);
+}

@@ -182,6 +182,56 @@
       }])
     }
 
+    function sendMulticall() {
+      // Payload constructed from multicall_test.html
+      let p = ""
+      p += "82ad56cb" // Selector
+      p += "0".repeat(62) + "20" // Array Offset (32)
+
+      // Array data starts at 32
+      p += "0".repeat(63) + "1" // Length
+      p += "0".repeat(62) + "40" // Item 0 Offset (64, rel to 32 -> 96)
+
+      // Struct at 96
+      p += "0".repeat(24) + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // Target @ 96
+      p += "0".repeat(63) + "1" // AllowFailure @ 128
+      p += "0".repeat(62) + "60" // CallData Offset (96, rel to 96 -> 192) @ 160
+
+      // Data at 192
+      p += "0".repeat(63) + "4" // Bytes Length @ 192
+      p += "12345678" + "0".repeat(56) // Bytes Data @ 224
+
+      const callData = "0x" + p
+      const target = "0xcA11bde05977b3631167028862bE2a173976cA11"
+
+      // Mock Result
+      // Result[] -> Offset(32), Length(1), ItemOffset(32->64)
+      // Struct: Success(32->1), Offset(32->64->96)
+      // Data: Len(32->4), Val(32)
+      let r = ""
+      r += "0".repeat(62) + "20" // Array Offset (32)
+
+      // Array Data at 32
+      r += "0".repeat(63) + "1" // Length
+      r += "0".repeat(62) + "20" // Item 0 Offset (32 -> 64)
+
+      // Item 0 at 64
+      r += "0".repeat(63) + "1" // Success (true)
+      r += "0".repeat(62) + "40" // Data Offset (64 -> 128)
+
+      // Data at 128
+      r += "0".repeat(63) + "4" // Length 4
+      r += "deadbeef" + "0".repeat(56) // Result Data (0xdeadbeef)
+
+      const resultData = "0x" + r
+
+      sendRequest('eth_call', [{
+        to: target,
+        data: callData,
+        from: '0xUserAddress'
+      }], { result: resultData })
+    }
+
     function testWelcomeScreen() {
       chrome.storage.local.clear(() => {
         console.log('Storage cleared.')
@@ -223,6 +273,7 @@
     <button onclick="sendEthCall()">Send eth_call</button>
     <button onclick="sendRevertedCall()">Send Reverted Call (Error)</button>
     <button onclick="sendLongParam()">Send Long Params</button>
+    <button onclick="sendMulticall()">Send Multicall3</button>
     <hr>
     <label>
       Panel Width: <input type="range" min="300" max="1200" value="800"
@@ -401,6 +452,7 @@
 
   </div>
 
+  <script src="../multicall.js"></script>
   <script src="../panel.js"></script>
 </body>
 
