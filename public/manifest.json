@@ -7,5 +7,9 @@
   "permissions": [
     "contextMenus",
     "storage"
+  ],
+  "host_permissions": [
+    "https://api.etherscan.io/*",
+    "https://api.tenderly.co/*"
   ]
 }

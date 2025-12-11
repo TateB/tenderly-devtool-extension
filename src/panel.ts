@@ -1,45 +1,78 @@
-// DOM Elements
-const splitView = document.getElementById('split-view');
-const listElement = document.getElementById('request-list');
-const detailContainer = document.getElementById('detaill-container');
-const detailPlaceholder = document.getElementById('detail-placeholder');
-const detailView = document.getElementById('detail-view');
-const welcomeScreen = document.getElementById('welcome-screen');
+import { decodeFunctionData, decodeFunctionResult, type Hex } from 'viem';
+import { EtherscanClient } from './etherscan';
+import { MulticallDecoder } from './multicall';
+
+// Interfaces
+interface Config {
+    tenderly_api_key?: string;
+    etherscan_api_key?: string;
+    tenderly_account_slug?: string;
+    tenderly_project_slug?: string;
+    tenderly_chain_id?: string;
+    intercept_methods?: string[];
+    intercept_reverted_only?: boolean;
+}
+
+interface RequestData {
+    id: string;
+    timestamp: Date;
+    url: string;
+    rpcRequest: any;
+    rpcResponse: any;
+    multicallData?: MulticallItem[];
+}
+
+interface MulticallItem {
+    target: string;
+    allowFailure: boolean;
+    callData: string;
+    success?: boolean;
+    returnData?: string;
+}
+
+const splitView = document.getElementById('split-view') as HTMLElement;
+const listElement = document.getElementById('request-list') as HTMLElement;
+const detailContainer = document.getElementById('detaill-container') as HTMLElement;
+const detailPlaceholder = document.getElementById('detail-placeholder') as HTMLElement;
+const detailView = document.getElementById('detail-view') as HTMLElement;
+const welcomeScreen = document.getElementById('welcome-screen') as HTMLElement;
 
 // Settings View
-const settingsView = document.getElementById('settings-view');
-const navSettingsBtn = document.getElementById('nav-settings');
-const closeSettingsBtn = document.getElementById('close-settings');
-const saveStatus = document.getElementById('save-status');
+const settingsView = document.getElementById('settings-view') as HTMLElement;
+const navSettingsBtn = document.getElementById('nav-settings') as HTMLElement;
+const closeSettingsBtn = document.getElementById('close-settings') as HTMLElement;
+const saveStatus = document.getElementById('save-status') as HTMLElement;
 
 // Welcome Actions
-const btnOpenSettingsWelcome = document.getElementById('btn-open-settings-welcome');
+const btnOpenSettingsWelcome = document.getElementById('btn-open-settings-welcome') as HTMLButtonElement;
 
 // Detail View Elements
-const detailMethod = document.getElementById('detail-method');
-const detailUrl = document.getElementById('detail-url');
-const detailRequestCode = document.getElementById('detail-request-code');
-const detailResponseCode = document.getElementById('detail-response-code');
-const detailStatusIndicator = document.getElementById('detail-status-indicator');
-const simulateBtn = document.getElementById('simulate-btn');
-const simulationResultContainer = document.getElementById('simulation-result-container');
+const detailMethod = document.getElementById('detail-method') as HTMLElement;
+const detailUrl = document.getElementById('detail-url') as HTMLElement;
+const detailRequestCode = document.getElementById('detail-request-code') as HTMLElement;
+const detailResponseCode = document.getElementById('detail-response-code') as HTMLElement;
+const detailStatusIndicator = document.getElementById('detail-status-indicator') as HTMLElement;
+const simulateBtn = document.getElementById('simulate-btn') as HTMLButtonElement;
+const simulationResultContainer = document.getElementById('simulation-result-container') as HTMLElement;
 
 // Config Inputs
-const apiKeyInput = document.getElementById('api-key');
-const accountSlugInput = document.getElementById('account-slug');
-const projectSlugInput = document.getElementById('project-slug');
-const chainIdInput = document.getElementById('chain-id-override');
-const saveBtn = document.getElementById('save-config');
-const resetBtn = document.getElementById('reset-config');
+const apiKeyInput = document.getElementById('api-key') as HTMLInputElement;
+const accountSlugInput = document.getElementById('account-slug') as HTMLInputElement;
+const projectSlugInput = document.getElementById('project-slug') as HTMLInputElement;
+const chainIdInput = document.getElementById('chain-id-override') as HTMLInputElement;
+const etherscanApiKeyInput = document.getElementById('etherscan-api-key') as HTMLInputElement;
+const saveBtn = document.getElementById('save-config') as HTMLButtonElement;
+const resetBtn = document.getElementById('reset-config') as HTMLButtonElement;
 
-const interceptEstimateGasInput = document.getElementById('intercept-estimate-gas');
-const interceptEthCallInput = document.getElementById('intercept-eth-call');
-const interceptRevertedOnlyInput = document.getElementById('intercept-reverted-only');
+const interceptEstimateGasInput = document.getElementById('intercept-estimate-gas') as HTMLInputElement;
+const interceptEthCallInput = document.getElementById('intercept-eth-call') as HTMLInputElement;
+const interceptRevertedOnlyInput = document.getElementById('intercept-reverted-only') as HTMLInputElement;
 
 // State
-let requests = []; // Store requests to easy access for details
-let currentConfig = {};
-let selectedRequestId = null;
+let requests: RequestData[] = []; 
+let currentConfig: Config = {};
+let etherscanClient: EtherscanClient | null = null;
+let selectedRequestId: string | null = null;
 const TABS = {
     REQUESTS: 'requests',
     SETTINGS: 'settings'
@@ -86,9 +119,8 @@ function setupEventListeners() {
     }
 }
 
-function switchTab(tabName) {
+function switchTab(tabName: string) {
     activeTab = tabName;
-    // updateNavState(); // Removed as we no longer have tabs
     
     if (tabName === TABS.SETTINGS) {
         loadConfig(); // Refresh config values when entering
@@ -110,6 +142,7 @@ function switchTab(tabName) {
 function loadConfig() {
     const keys = [
         'tenderly_api_key', 
+        'etherscan_api_key',
         'tenderly_account_slug', 
         'tenderly_project_slug', 
         'tenderly_chain_id',
@@ -118,23 +151,32 @@ function loadConfig() {
     ];
 
     chrome.storage.local.get(keys, (result) => {
-        currentConfig = result;
+        currentConfig = result as Config;
+
 
         // Populate Inputs
-        if (apiKeyInput) apiKeyInput.value = result.tenderly_api_key || '';
-        if (accountSlugInput) accountSlugInput.value = result.tenderly_account_slug || '';
-        if (projectSlugInput) projectSlugInput.value = result.tenderly_project_slug || '';
-        if (chainIdInput) chainIdInput.value = result.tenderly_chain_id || '';
+        if (apiKeyInput) apiKeyInput.value = currentConfig.tenderly_api_key || '';
+        if (etherscanApiKeyInput) etherscanApiKeyInput.value = currentConfig.etherscan_api_key || '';
+        if (accountSlugInput) accountSlugInput.value = currentConfig.tenderly_account_slug || '';
+        if (projectSlugInput) projectSlugInput.value = currentConfig.tenderly_project_slug || '';
+        if (chainIdInput) chainIdInput.value = currentConfig.tenderly_chain_id || '';
 
         // Checkboxes
-        const methods = result.intercept_methods || ['eth_estimateGas']; 
+        const methods = currentConfig.intercept_methods || ['eth_estimateGas']; 
         if (interceptEstimateGasInput) interceptEstimateGasInput.checked = methods.includes('eth_estimateGas');
         if (interceptEthCallInput) interceptEthCallInput.checked = methods.includes('eth_call');
         
-        if (interceptRevertedOnlyInput) interceptRevertedOnlyInput.checked = !!result.intercept_reverted_only;
+        if (interceptRevertedOnlyInput) interceptRevertedOnlyInput.checked = !!currentConfig.intercept_reverted_only;
         
         // Update View State (Welcome/Placeholder/Detail)
         updateViewState();
+        
+        // Init Etherscan Client
+        if (currentConfig.etherscan_api_key) {
+            etherscanClient = new EtherscanClient(currentConfig.etherscan_api_key);
+        } else {
+            etherscanClient = null;
+        }
     });
 }
 
@@ -164,18 +206,20 @@ function updateViewState() {
 
 function saveConfig() {
     const key = apiKeyInput.value.trim();
+    const etherscanKey = etherscanApiKeyInput.value.trim();
     const account = accountSlugInput.value.trim();
     const project = projectSlugInput.value.trim();
     const chainId = chainIdInput.value.trim();
 
-    const methods = [];
+    const methods: string[] = [];
     if (interceptEstimateGasInput.checked) methods.push('eth_estimateGas');
     if (interceptEthCallInput.checked) methods.push('eth_call');
 
     const revertedOnly = interceptRevertedOnlyInput.checked;
 
-    const newSettings = {
+    const newSettings: Config = {
         'tenderly_api_key': key,
+        'etherscan_api_key': etherscanKey,
         'tenderly_account_slug': account,
         'tenderly_project_slug': project,
         'tenderly_chain_id': chainId,
@@ -185,8 +229,6 @@ function saveConfig() {
 
     chrome.storage.local.set(newSettings, () => {
         currentConfig = newSettings;
-        // Don't auto-switch; user might want to stay in settings.
-        // Just show success.
         
         if (saveStatus) {
             saveStatus.style.opacity = '1';
@@ -201,6 +243,7 @@ function resetConfig() {
     if (confirm('Are you sure you want to reset all settings to default?')) {
         chrome.storage.local.clear(() => {
             if(apiKeyInput) apiKeyInput.value = '';
+            if(etherscanApiKeyInput) etherscanApiKeyInput.value = '';
             if(accountSlugInput) accountSlugInput.value = '';
             if(projectSlugInput) projectSlugInput.value = '';
             if(chainIdInput) chainIdInput.value = '';
@@ -216,11 +259,11 @@ function resetConfig() {
 
 // --- Request Handling ---
 
-async function handleRequest(request) {
+async function handleRequest(request: any) {
     if (request.request.method !== 'POST') return;
     
     // Check content type
-    const contentTypeHeader = request.request.headers.find(h => h.name.toLowerCase() === 'content-type');
+    const contentTypeHeader = request.request.headers.find((h: any) => h.name.toLowerCase() === 'content-type');
     if (!contentTypeHeader || !contentTypeHeader.value.includes('application/json')) {
         return;
     }
@@ -242,8 +285,8 @@ async function handleRequest(request) {
     if (!allowedMethods.includes(rpcRequest.method)) return;
 
     // Get Response Content to check for errors/reverts
-    request.getContent((content, encoding) => {
-        let rpcResponse = null;
+    request.getContent((content: string, encoding: string) => {
+        let rpcResponse: any = null;
         try {
             rpcResponse = JSON.parse(content);
         } catch(e) {}
@@ -254,26 +297,33 @@ async function handleRequest(request) {
         }
         
         // Check for Multicall3
-        let multicallData = null;
+        let multicallData: MulticallItem[] | null = null;
+        let to: string | undefined;
+
         if (rpcRequest.params && rpcRequest.params.length > 0) {
             const txParams = rpcRequest.params[0];
-            const to = txParams.to;
+            to = txParams.to;
             const data = txParams.data;
             
-            if (MulticallDecoder.isMulticall(to, data)) {
+            if (to && MulticallDecoder.isMulticall(to, data)) {
                  try {
-                     const subCalls = MulticallDecoder.decode(data);
+                     const subCallsRaw = MulticallDecoder.decode(data);
                      
-                     let subResults = [];
+                     // subCallsRaw is array of {target, allowFailure, callData}
+                     
+                     let subResults: any[] = [];
                      if (rpcResponse && rpcResponse.result) {
-                         subResults = MulticallDecoder.decodeResult(rpcResponse.result);
+                         subResults = MulticallDecoder.decodeResult(rpcResponse.result) as any[];
                      }
                      
                      // Merge calls with results
-                     multicallData = subCalls.map((call, index) => {
+                    multicallData = (subCallsRaw as any[]).map((call, index) => {
                          const res = subResults[index] || {};
+                         // call is {target, allowFailure, callData} from viem object
                          return {
-                             ...call,
+                             target: call.target,
+                             allowFailure: call.allowFailure,
+                             callData: call.callData,
                              success: res.success,
                              returnData: res.returnData
                          };
@@ -284,14 +334,20 @@ async function handleRequest(request) {
             }
         }
 
+        if (to && to !== '0x' && etherscanClient) {
+            detectNetwork(request.request.url).then(chainId => {
+                 etherscanClient?.prefetch(to, chainId);
+            });
+        }
+
         const reqId = Date.now() + Math.random().toString();
-        const reqData = {
+        const reqData: RequestData = {
             id: reqId,
             timestamp: new Date(),
             url: request.request.url,
             rpcRequest,
             rpcResponse,
-            multicallData // Array of { target, allowFailure, callData, success, returnData }
+            multicallData: multicallData || undefined 
         };
         
         requests.push(reqData);
@@ -299,7 +355,7 @@ async function handleRequest(request) {
     });
 }
 
-function addRequestToList(reqData) {
+function addRequestToList(reqData: RequestData) {
     // Remove empty state if present
     const emptyState = listElement.querySelector('.empty-state');
     if (emptyState) emptyState.remove();
@@ -333,7 +389,7 @@ function addRequestToList(reqData) {
     `;
 
     if (isMulticall) {
-        const iconInfo = item.querySelector('.expand-icon');
+        const iconInfo = item.querySelector('.expand-icon') as HTMLElement;
         if (iconInfo) {
             iconInfo.onclick = (e) => {
                 e.stopPropagation();
@@ -358,7 +414,7 @@ function addRequestToList(reqData) {
         
         container.appendChild(item);
         
-        if (isMulticall) {
+        if (isMulticall && reqData.multicallData) {
             const subList = document.createElement('div');
             subList.className = 'sub-request-list';
             subList.id = `sub-list-${reqData.id}`;
@@ -369,7 +425,7 @@ function addRequestToList(reqData) {
                 subItem.className = 'request-item sub-item';
                 subItem.dataset.id = `${reqData.id}-${idx}`; // Composite ID
                 subItem.dataset.parentId = reqData.id;
-                subItem.dataset.subIndex = idx;
+                subItem.dataset.subIndex = idx.toString();
                 
                 const subStatus = sub.success ? 'success' : 'error';
                 
@@ -404,7 +460,7 @@ function addRequestToList(reqData) {
     }
 }
 
-function toggleMulticall(id) {
+function toggleMulticall(id: string) {
     const list = document.getElementById(`sub-list-${id}`);
     const grp = document.getElementById(`req-group-${id}`);
     
@@ -412,14 +468,14 @@ function toggleMulticall(id) {
         const isHidden = list.style.display === 'none';
         list.style.display = isHidden ? 'flex' : 'none';
         
-        const icon = grp.querySelector('.expand-icon');
+        const icon = grp ? grp.querySelector('.expand-icon') as HTMLElement : null;
         if (icon) icon.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
     }
 }
 
 // backBtnHtml removed
 
-function selectRequest(id, subReqIndex = null) {
+function selectRequest(id: string, subReqIndex: number | null = null) {
     selectedRequestId = id;
     const reqData = requests.find(r => r.id === id);
     if (!reqData) return;
@@ -432,12 +488,8 @@ function selectRequest(id, subReqIndex = null) {
         // Select Sub Item
         const subEl = document.querySelector(`.request-item[data-id="${id}-${subReqIndex}"]`);
         if (subEl) subEl.classList.add('active');
-        // Ensure parent expanded? Maybe.
     } else {
         // Select Main Item
-        // Note: Main item doesn't have data-id on the div generated in addRequestToList anymore... wait.
-        // In addRequestToList: item.dataset.id = reqData.id. 
-        // So querySelector by data-id should work for main item.
         const itemEl = document.querySelector(`.request-item[data-id="${id}"]`);
         if (itemEl) itemEl.classList.add('active');
     }
@@ -445,83 +497,95 @@ function selectRequest(id, subReqIndex = null) {
     updateViewState(); // Ensure correct container shown
 
     // Handle Multicall View
-    const isMulticall = !!reqData.multicallData;
     const isSubRequest = subReqIndex !== null;
 
-    // If it is multicall main item, show overview OR just standard view?
-    // User: "subrequests should drop down... showing all requests".
-    // If clicking main item, maybe just show standard view (the aggregate call).
-    // Let's remove renderMulticallList usage and stick to standard view for main item.
-    
-    // Prepare Detail View
+    // Prepare Detail View Header
     if (detailMethod) detailMethod.textContent = isSubRequest ? 'ETH_CALL (Sub)' : reqData.rpcRequest.method;
     if (detailUrl) detailUrl.textContent = reqData.url;
     
-    // Header Actions
-    // Clear any inserted back button (Sidebar handles navigation now)
-    const existingBack = document.getElementById('detail-back-btn');
-    if (existingBack) existingBack.remove();
+    // Clear Header extra elements (Contract Name)
+    const existingContractName = document.getElementById('detail-contract-name');
+    if (existingContractName) existingContractName.remove();
 
     // Sub Request Data extraction
     let displayReq = reqData.rpcRequest;
     let displayRes = reqData.rpcResponse;
-    let isError = reqData.rpcResponse && reqData.rpcResponse.error;
-    let simData = reqData; // Object to pass to performSimulation
+    const isError = reqData.rpcResponse && reqData.rpcResponse.error;
+    let simData: any = reqData; // Object to pass to performSimulation
 
-    if (isSubRequest) {
-        const sub = reqData.multicallData[subReqIndex];
-        const parentParams = reqData.rpcRequest.params ? reqData.rpcRequest.params[0] : {};
-        
-        // Construct pseudo RPC request for display
-        displayReq = {
-            method: 'eth_call',
-            params: [{
-                to: sub.target,
-                data: sub.callData,
-                from: parentParams.from, // Inherit sender
-                gas: parentParams.gas    // Inherit gas
-            }]
-        };
-        displayRes = sub.returnData ? { result: sub.returnData } : { error: { message: "Failed or no data" } };
-        isError = !sub.success;
-        
-        // Construct simData for sub-request
-        simData = {
-            url: reqData.url,
-            rpcRequest: displayReq
-        };
+    if (isSubRequest && reqData.multicallData) {
+        const sub = reqData.multicallData[subReqIndex as number];
+        if (sub) {
+            const parentParams = reqData.rpcRequest.params ? reqData.rpcRequest.params[0] : {};
+            
+            // Construct pseudo RPC request for display
+            displayReq = {
+                method: 'eth_call',
+                params: [{
+                    to: sub.target,
+                    data: sub.callData,
+                    from: parentParams.from, // Inherit sender
+                    gas: parentParams.gas    // Inherit gas
+                }]
+            };
+            displayRes = sub.returnData ? { result: sub.returnData } : { error: { message: "Failed or no data" } };
+            
+            // Construct simData for sub-request
+            simData = {
+                url: reqData.url,
+                rpcRequest: displayReq
+            };
+        }
     }
 
-    // Status Indicator Description
+    // Status Indicator
     if (detailStatusIndicator) {
-         detailStatusIndicator.className = 'status-indicator ' + (isError ? 'error' : 'success');
-         detailStatusIndicator.title = isError ? 'Request Failed' : 'Request Successful';
+         let currentError = isError;
+         if (isSubRequest && reqData.multicallData) {
+              const sub = reqData.multicallData[subReqIndex as number];
+              if (sub) currentError = !sub.success;
+         }
+         
+         detailStatusIndicator.className = 'status-indicator ' + (currentError ? 'error' : 'success');
+         detailStatusIndicator.title = currentError ? 'Request Failed' : 'Request Successful';
     }
 
-    // Ensure detail-body is clean (if we previously used renderMulticallList)
+    // --- REBUILD DETAIL BODY WITH COLLAPSIBLES ---
     const body = document.querySelector('.detail-body');
     if (body) {
-        // If the body doesn't contain the standard containers, restore them
-        // Actually, since we removed `renderMulticallList`, the body should stay consistent.
-        // Just in case, if the user was on the old view.
-        if (!document.getElementById('detail-request-code')) {
-             body.innerHTML = `
-                <div class="section-title">Request Params</div>
-                <div id="detail-request-code" class="code-block">${JSON.stringify(displayReq, null, 2)}</div>
+        body.innerHTML = ''; // Clear everything
 
-                <div class="section-title">Response</div>
-                <div id="detail-response-code" class="code-block">${displayRes ? JSON.stringify(displayRes, null, 2) : 'No Response'}</div>
-            `;
-            // Reassign globals
-             const reqCodeEl = document.getElementById('detail-request-code');
-             const resCodeEl = document.getElementById('detail-response-code');
-             // We can't reassign const globals. But textContent set above won't work if elements didn't exist.
-             // But here we set innerHTML with content. So it's fine.
-        } else {
-             // Standard update
-             if (detailRequestCode) detailRequestCode.textContent = JSON.stringify(displayReq, null, 2);
-             if (detailResponseCode) detailResponseCode.textContent = displayRes ? JSON.stringify(displayRes, null, 2) : 'No Response';
-        }
+        // 1. Request Params
+        const reqParamsContent = document.createElement('div');
+        reqParamsContent.className = 'code-block';
+        reqParamsContent.textContent = JSON.stringify(displayReq, null, 2);
+        body.appendChild(createCollapsibleSection('Request Params', reqParamsContent, false));
+
+        // 2. Decoded Input (Placeholder)
+        const decodedInputContent = document.createElement('div');
+        decodedInputContent.id = 'decoded-input-content';
+        decodedInputContent.className = 'code-block';
+        decodedInputContent.textContent = 'Loading...';
+        const decodedInputSection = createCollapsibleSection('Decoded Input', decodedInputContent, true); // Default Open
+        decodedInputSection.id = 'section-decoded-input';
+        decodedInputSection.style.display = 'none'; // Hide until loaded
+        body.appendChild(decodedInputSection);
+
+        // 3. Response
+        const responseContent = document.createElement('div');
+        responseContent.className = 'code-block';
+        responseContent.textContent = displayRes ? JSON.stringify(displayRes, null, 2) : 'No Response';
+        body.appendChild(createCollapsibleSection('Response', responseContent, false));
+
+         // 4. Decoded Output (Placeholder)
+        const decodedOutputContent = document.createElement('div');
+        decodedOutputContent.id = 'decoded-output-content';
+        decodedOutputContent.className = 'code-block';
+        decodedOutputContent.textContent = 'Loading...';
+        const decodedOutputSection = createCollapsibleSection('Decoded Output', decodedOutputContent, false);
+        decodedOutputSection.id = 'section-decoded-output';
+        decodedOutputSection.style.display = 'none'; // Hide until loaded
+        body.appendChild(decodedOutputSection);
     }
 
     // Reset Result Container
@@ -532,10 +596,11 @@ function selectRequest(id, subReqIndex = null) {
         simulateBtn.disabled = false;
         simulateBtn.style.background = ''; // reset to default css
         simulateBtn.innerHTML = '<span>Simulate Transaction</span>';
-        
-        // Wire up Simulate Button
         simulateBtn.onclick = () => performSimulation(simData);
     }
+
+    // Trigger metadata fetch & decoding
+    decodeRequestIfPossible(reqData, subReqIndex);
 }
 
 // Function renderMulticallList removed.
@@ -546,17 +611,19 @@ function selectRequest(id, subReqIndex = null) {
 
 // --- Simulation Logic ---
 
-async function performSimulation(reqData) {
+async function performSimulation(reqData: RequestData) {
     const btn = simulateBtn;
     const resultContainer = simulationResultContainer;
     
     // Check config
-    const config = await new Promise(resolve => chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug', 'tenderly_chain_id'], resolve));
+    const configRaw = await new Promise(resolve => chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug', 'tenderly_chain_id'], resolve)) as Config;
+    const config = configRaw; // define type
     
     if (!config.tenderly_api_key || !config.tenderly_account_slug || !config.tenderly_project_slug) {
         alert('Configuration missing. Please check Settings.');
-        if (settingsOverlay) settingsOverlay.classList.add('visible');
-        updateNavState('settings');
+        // settingsOverlay? No such var anymore.
+        // if (settingsOverlay) settingsOverlay.classList.add('visible');
+        switchTab(TABS.SETTINGS); // use switchTab instead
         return;
     }
 
@@ -567,7 +634,7 @@ async function performSimulation(reqData) {
     if (resultContainer) resultContainer.innerHTML = '';
 
     try {
-        let txParams, stateOverrides;
+        let txParams: any, stateOverrides: any;
 
         if (rpcRequest.params && rpcRequest.params.length > 0) {
             txParams = rpcRequest.params[0];
@@ -583,7 +650,7 @@ async function performSimulation(reqData) {
              networkId = await detectNetwork(url);
         }
 
-        const simulationBody = {
+        const simulationBody: any = {
             network_id: networkId,
             from: txParams.from || '0x0000000000000000000000000000000000000000',
             to: txParams.to,
@@ -597,9 +664,11 @@ async function performSimulation(reqData) {
         if (txParams.gasPrice) simulationBody.gas_price = BigInt(txParams.gasPrice).toString();
         
         if (stateOverrides) {
-             simulationBody.state_objects = {};
-             for (const [address, override] of Object.entries(stateOverrides)) {
-                 simulationBody.state_objects[address] = {};
+             simulationBody.state_objects = {} as any;
+             // Use explicit casting to avoid never type inference issues
+             const entries = Object.entries(stateOverrides) as [string, any][];
+             for (const [address, override] of entries) {
+                 simulationBody.state_objects[address] = {} as any;
                  if (override.balance) simulationBody.state_objects[address].balance = BigInt(override.balance).toString();
                  if (override.nonce) simulationBody.state_objects[address].nonce = parseInt(override.nonce, 16);
                  if (override.code) simulationBody.state_objects[address].code = override.code;
@@ -609,7 +678,7 @@ async function performSimulation(reqData) {
         }
         
         if (txParams.accessList) {
-             simulationBody.access_list = txParams.accessList.map(item => ({
+             simulationBody.access_list = txParams.accessList.map((item: any) => ({
                  address: item.address,
                  storage_keys: item.storageKeys || []
              }));
@@ -619,7 +688,7 @@ async function performSimulation(reqData) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Access-Key': config.tenderly_api_key
+                'X-Access-Key': config.tenderly_api_key as string
             },
             body: JSON.stringify(simulationBody)
         });
@@ -639,7 +708,7 @@ async function performSimulation(reqData) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Access-Key': config.tenderly_api_key
+                    'X-Access-Key': config.tenderly_api_key as string
                 }
             });
         } catch (shareErr) {
@@ -678,7 +747,7 @@ async function performSimulation(reqData) {
     }
 }
 
-async function detectNetwork(requestUrl) {
+async function detectNetwork(requestUrl: string) {
     if (!requestUrl) return '1';
     
     try {
@@ -714,4 +783,163 @@ async function detectNetwork(requestUrl) {
     if (lowerUrl.includes('base')) return '8453';
 
     return '1'; 
+}
+
+async function decodeRequestIfPossible(reqData: RequestData, subIndex: number | null) {
+    if (!etherscanClient) return;
+    
+    // Determine Target and Data
+    let to: string | undefined;
+    let data: string | undefined;
+    let returnData: string | undefined;
+    
+    if (subIndex !== null && reqData.multicallData) {
+         const sub = reqData.multicallData[subIndex];
+         if (sub) {
+             to = sub.target;
+             data = sub.callData;
+             returnData = sub.returnData;
+         }
+    } else {
+        const params = reqData.rpcRequest.params?.[0];
+        to = params?.to;
+        data = params?.data;
+        // Determine return data from rpcResponse
+        if (reqData.rpcResponse && !reqData.rpcResponse.error) {
+            returnData = reqData.rpcResponse.result;
+        }
+    }
+    
+    if (!to || !data || data === '0x') return;
+    
+    try {
+        // Get Chain ID (async)
+        const chainId = currentConfig.tenderly_chain_id || await detectNetwork(reqData.url);
+        
+        const metadata = await etherscanClient.getContractMetadata(to, chainId);
+        
+        // Verify same request
+        if (selectedRequestId !== reqData.id) return;
+
+        if (metadata) {
+            const { contractName, abi } = metadata;
+
+            // 1. Display Contract Name (if available)
+            if (contractName) {
+                 let nameEl = document.getElementById('detail-contract-name');
+                 if (!nameEl) {
+                     nameEl = document.createElement('div');
+                     nameEl.id = 'detail-contract-name';
+                     nameEl.style.fontSize = '12px';
+                     nameEl.style.color = 'var(--text-secondary)';
+                     nameEl.style.marginTop = '4px';
+                     // Fix: Insert after detailUrl, inside its parent wrapper
+                     if (detailUrl.parentNode) {
+                        detailUrl.parentNode.insertBefore(nameEl, detailUrl.nextSibling);
+                     }
+                 }
+                 nameEl.textContent = `Contract: ${contractName}`;
+            }
+
+            // 2. Decode Input
+            try {
+                const decoded = decodeFunctionData({ abi, data: data as Hex });
+                if (detailMethod) {
+                    detailMethod.textContent = decoded.functionName;
+                }
+
+                const decodedInputSection = document.getElementById('section-decoded-input');
+                const decodedInputContent = document.getElementById('decoded-input-content');
+                
+                if (decodedInputSection && decodedInputContent) {
+                    decodedInputSection.style.display = 'block';
+                    decodedInputContent.textContent = JSON.stringify(decoded.args, (key, value) => 
+                        typeof value === 'bigint' ? value.toString() : value
+                    , 2);
+                }
+
+                // 3. Decode Output
+                if (returnData && returnData !== '0x') {
+                    try {
+                        const decodedResult = decodeFunctionResult({
+                            abi,
+                            functionName: decoded.functionName,
+                            data: returnData as Hex
+                        });
+
+                        const decodedOutputSection = document.getElementById('section-decoded-output');
+                        const decodedOutputContent = document.getElementById('decoded-output-content');
+                        
+                        if (decodedOutputSection && decodedOutputContent) {
+                            decodedOutputSection.style.display = 'block';
+                            decodedOutputContent.textContent = JSON.stringify(decodedResult, (key, value) => 
+                                typeof value === 'bigint' ? value.toString() : value
+                            , 2);
+                        }
+                    } catch (err) {
+                        console.warn('Output decode failed', err);
+                    }
+                }
+
+            } catch (err) {
+                // console.warn('Input decode failed', err);
+            }
+        }
+    } catch (e) {
+        // console.warn('Decode failed', e);
+    }
+}
+
+function createCollapsibleSection(title: string, contentNode: HTMLElement, isOpen: boolean = false): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'collapsible-section';
+    container.style.border = '1px solid var(--border-color)';
+    container.style.borderRadius = '4px';
+    container.style.marginBottom = '8px';
+    container.style.overflow = 'hidden';
+
+    // Header
+    const header = document.createElement('div');
+    header.style.padding = '8px 12px';
+    header.style.background = 'var(--bg-secondary)';
+    header.style.cursor = 'pointer';
+    header.style.display = 'flex';
+    header.style.alignItems = 'center';
+    header.style.justifyContent = 'space-between';
+    header.style.userSelect = 'none';
+
+    const titleEl = document.createElement('span');
+    titleEl.textContent = title;
+    titleEl.style.fontWeight = '500';
+    titleEl.style.fontSize = '12px';
+
+    const icon = document.createElement('span');
+    icon.textContent = '▼';
+    icon.style.fontSize = '10px';
+    icon.style.transition = 'transform 0.2s';
+    icon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+
+    header.appendChild(titleEl);
+    header.appendChild(icon);
+
+    // Content Wrapper
+    const content = document.createElement('div');
+    content.style.display = isOpen ? 'block' : 'none';
+    content.style.padding = '12px';
+    content.style.background = 'var(--bg-primary)';
+    content.style.borderTop = '1px solid var(--border-color)';
+    
+    content.appendChild(contentNode);
+
+    // Interaction
+    header.onclick = () => {
+        const isCurrentlyOpen = content.style.display === 'block';
+        content.style.display = isCurrentlyOpen ? 'none' : 'block';
+        icon.style.transform = isCurrentlyOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+    };
+
+    container.appendChild(header);
+    container.appendChild(content);
+
+    return container;
 }

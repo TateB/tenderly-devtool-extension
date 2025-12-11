@@ -1,0 +1,17 @@
+{
+  "name": "tenderly-devtool-extension",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/chrome": "^0.1.32"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "viem": "^2.41.2"
+  },
+  "scripts": {
+    "build": "bun run build.ts"
+  }
+}

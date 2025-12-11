@@ -13,9 +13,17 @@ A Chrome DevTools extension that inspects Ethereum JSON-RPC requests from the Ne
 ## Installation
 
 1. Clone or download this repository.
-2. Open Chrome and navigate to `chrome://extensions`.
-3. Enable **Developer mode** in the top right.
-4. Click **Load unpacked** and select the project directory.
+2. Run `bun install` to install dependencies.
+3. Run `bun run build` to generate the extension.
+4. Open Chrome and navigate to `chrome://extensions`.
+5. Enable **Developer mode** in the top right.
+6. Click **Load unpacked** and select the `dist` directory.
+
+## Development
+
+The source code is located in `src/` and static assets in `public/`.
+- Run `bun run build` to rebuild the extension after changes.
+- Using `bun run src/verify_decoder.ts` to verify the decoder logic.
 
 ## Configuration
 
