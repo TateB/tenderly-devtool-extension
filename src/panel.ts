@@ -1,4 +1,4 @@
-import { decodeFunctionData, decodeFunctionResult, type Hex } from 'viem';
+import { decodeErrorResult, decodeFunctionData, decodeFunctionResult, type Hex } from 'viem';
 import { EtherscanClient } from './etherscan';
 import { MulticallDecoder } from './multicall';
 
@@ -616,7 +616,7 @@ async function performSimulation(reqData: RequestData) {
     const resultContainer = simulationResultContainer;
     
     // Check config
-    const configRaw = await new Promise(resolve => chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug', 'tenderly_chain_id'], resolve)) as Config;
+    const configRaw = await new Promise<Config>(resolve => chrome.storage.local.get(['tenderly_api_key', 'tenderly_account_slug', 'tenderly_project_slug', 'tenderly_chain_id'], (items) => resolve(items as Config)));
     const config = configRaw; // define type
     
     if (!config.tenderly_api_key || !config.tenderly_account_slug || !config.tenderly_project_slug) {
@@ -805,8 +805,12 @@ async function decodeRequestIfPossible(reqData: RequestData, subIndex: number | 
         to = params?.to;
         data = params?.data;
         // Determine return data from rpcResponse
-        if (reqData.rpcResponse && !reqData.rpcResponse.error) {
-            returnData = reqData.rpcResponse.result;
+        if (reqData.rpcResponse) {
+            if (!reqData.rpcResponse.error) {
+                returnData = reqData.rpcResponse.result;
+            } else if (reqData.rpcResponse.error && reqData.rpcResponse.error.data) {
+                returnData = reqData.rpcResponse.error.data;
+            }
         }
     }
     
@@ -859,7 +863,16 @@ async function decodeRequestIfPossible(reqData: RequestData, subIndex: number | 
                 }
 
                 // 3. Decode Output
-                if (returnData && returnData !== '0x') {
+                const isError = reqData.rpcResponse && !!reqData.rpcResponse.error;
+                
+                if (returnData === '0x' && isError) {
+                     const decodedOutputSection = document.getElementById('section-decoded-output');
+                     const decodedOutputContent = document.getElementById('decoded-output-content');
+                     if (decodedOutputSection && decodedOutputContent) {
+                        decodedOutputSection.style.display = 'block';
+                        decodedOutputContent.textContent = "Reverted (No data)";
+                     }
+                } else if (returnData && returnData !== '0x') {
                     try {
                         const decodedResult = decodeFunctionResult({
                             abi,
@@ -877,12 +890,43 @@ async function decodeRequestIfPossible(reqData: RequestData, subIndex: number | 
                             , 2);
                         }
                     } catch (err) {
-                        console.warn('Output decode failed', err);
+                        // Fallback: Try decoding as Error
+                        try {
+                            const decodedError = decodeErrorResult({
+                                abi,
+                                data: returnData as Hex
+                            });
+
+                            const decodedOutputSection = document.getElementById('section-decoded-output');
+                            const decodedOutputContent = document.getElementById('decoded-output-content');
+                            
+                            if (decodedOutputSection && decodedOutputContent) {
+                                decodedOutputSection.style.display = 'block';
+                                decodedOutputContent.textContent = "Reverted: " + JSON.stringify(decodedError, (key, value) => 
+                                    typeof value === 'bigint' ? value.toString() : value
+                                , 2);
+                            }
+                        } catch (err2) {
+                            console.warn('Output decode failed', err, err2);
+                        }
                     }
                 }
 
-            } catch (err) {
-                // console.warn('Input decode failed', err);
+            } catch (err: any) {
+                // Handle missing function selector or other decode errors
+                const decodedInputSection = document.getElementById('section-decoded-input');
+                const decodedInputContent = document.getElementById('decoded-input-content');
+                if (decodedInputSection && decodedInputContent) {
+                    decodedInputSection.style.display = 'block';
+                    // Check if it's a selector not found error (often "Function selector ... not found")
+                    const msg = err.message || String(err);
+                    if (msg.includes('selector') || msg.includes('not found')) {
+                         decodedInputContent.textContent = `Error: Function selector not found in ABI.\n\nRaw Error: ${msg}`;
+                    } else {
+                         decodedInputContent.textContent = `Decode Error: ${msg}`;
+                    }
+                    decodedInputContent.style.color = 'var(--accent-error)';
+                }
             }
         }
     } catch (e) {
