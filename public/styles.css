@@ -347,6 +347,24 @@ a:focus-visible {
   border: 1px solid rgba(125, 105, 255, 0.15);
 }
 
+.method-tag.multi.success {
+  color: var(--accent-success);
+  background: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.2);
+}
+
+.method-tag.multi.warning {
+  color: var(--accent-warning);
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.2);
+}
+
+.method-tag.multi.error {
+  color: var(--accent-error);
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.2);
+}
+
 .status-indicator {
   width: 6px;
   height: 6px;
@@ -399,6 +417,7 @@ a:focus-visible {
   justify-content: space-between;
   height: 64px;
   flex-shrink: 0;
+  gap: 16px; /* Ensure gap between content and actions */
 }
 
 .detail-actions {
@@ -446,6 +465,85 @@ a:focus-visible {
   overflow-x: auto;
   margin-bottom: 24px;
   white-space: pre;
+}
+
+/* Decoded Data Styles */
+.decoded-container {
+  background: var(--surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.decoded-function-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-color);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.decoded-params-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.decoded-param-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.decoded-param-label {
+  color: var(--text-muted);
+  min-width: 80px; /* Align nicer */
+  flex-shrink: 0;
+}
+
+.decoded-param-value {
+  color: var(--text-main);
+  word-break: break-all;
+}
+
+.decoded-error-name {
+    color: var(--accent-error);
+}
+
+/* Contract Info Header */
+.contract-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0; /* Enable truncation in children */
+    flex: 1;
+}
+
+.contract-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-main);
+}
+
+.contract-address {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.url-container {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 /* Empty / Placeholder / Welcome */
@@ -516,7 +614,7 @@ a:focus-visible {
 .btn-primary:not(:disabled):hover {
   background: var(--primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px var(--primary-glow);
+  /* box-shadow: 0 4px 12px var(--primary-glow); Removed per request */
 }
 
 .btn-primary:disabled {

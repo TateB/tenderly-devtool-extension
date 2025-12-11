@@ -373,17 +373,44 @@ function addRequestToList(reqData: RequestData) {
 
     const isMulticall = !!reqData.multicallData;
 
+    // Determine Method Label
+    let methodLabel = reqData.rpcRequest.method;
+    let selector = '';
+    
+    if (methodLabel === 'eth_call' || methodLabel === 'eth_estimateGas') {
+        const data = reqData.rpcRequest.params?.[0]?.data;
+        if (data && data.length >= 10) {
+            selector = data.substring(0, 10);
+            methodLabel = selector; // default to selector until resolved
+        }
+    }
+
+    // Multicall Tag Logic
+    let multiTag = '';
+    let multiCount = '';
+    if (isMulticall && reqData.multicallData) {
+        const total = reqData.multicallData.length;
+        const successCount = reqData.multicallData.filter(m => m.success).length;
+        
+        let multiClass = 'success';
+        if (successCount === 0 && total > 0) multiClass = 'error';
+        else if (successCount < total) multiClass = 'warning';
+        
+        multiTag = `<span class="method-tag multi ${multiClass}" style="font-size:9px;">MULTI</span>`;
+        multiCount = `<span style="font-size:10px; color:var(--text-muted); margin-left:4px;">(${total} calls)</span>`;
+    }
+
     item.innerHTML = `
         <div class="req-header">
-            <div style="display:flex; align-items:center; gap:6px;">
+            <div style="display:flex; align-items:center; gap:6px; min-width:0;">
                 ${isMulticall ? `<div class="expand-icon">▶</div>` : ''}
-                <span class="method-tag">${reqData.rpcRequest.method}</span>
-                ${isMulticall ? '<span class="method-tag" style="background:var(--accent-purple); color:white; font-size:9px;">MULTI</span>' : ''}
+                <span class="method-tag" id="method-tag-${reqData.id}">${methodLabel}</span>
+                ${multiTag}
             </div>
             <span class="status-indicator ${statusClass}"></span>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; width: 100%;">
-             <div class="req-summary">${reqData.rpcRequest.params ? JSON.stringify(reqData.rpcRequest.params).substring(0, 30) : '[]'}...</div>
+             <div class="req-summary">${multiCount || (reqData.rpcRequest.params ? JSON.stringify(reqData.rpcRequest.params).substring(0, 30) : '[]') + '...'}</div>
              <div class="req-time">${timeStr}</div>
         </div>
     `;
@@ -428,15 +455,16 @@ function addRequestToList(reqData: RequestData) {
                 subItem.dataset.subIndex = idx.toString();
                 
                 const subStatus = sub.success ? 'success' : 'error';
+                const subSelector = sub.callData.substring(0, 10);
                 
                 subItem.innerHTML = `
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span class="status-indicator ${subStatus}" style="width:4px; height:4px;"></span>
                         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-secondary);">
-                           Call #${idx + 1}
+                           #${idx + 1} <span style="opacity:0.7; font-size:10px;">${subSelector}</span>
                         </div>
                     </div>
-                    <div style="font-size:10px; opacity:0.5; font-family:var(--font-mono);">${sub.target.substring(0, 6)}...</div>
+                    <div style="font-size:10px; opacity:0.5; font-family:var(--font-mono);">${sub.target.substring(0, 8)}...</div>
                 `;
                 
                 subItem.onclick = (e) => {
@@ -501,7 +529,10 @@ function selectRequest(id: string, subReqIndex: number | null = null) {
 
     // Prepare Detail View Header
     if (detailMethod) detailMethod.textContent = isSubRequest ? 'ETH_CALL (Sub)' : reqData.rpcRequest.method;
-    if (detailUrl) detailUrl.textContent = reqData.url;
+    if (detailUrl) {
+         // Prevent text overflow in header
+         detailUrl.innerHTML = `<div class="url-container" title="${reqData.url}">${reqData.url}</div>`;
+    }
     
     // Clear Header extra elements (Contract Name)
     const existingContractName = document.getElementById('detail-contract-name');
@@ -554,38 +585,38 @@ function selectRequest(id: string, subReqIndex: number | null = null) {
     const body = document.querySelector('.detail-body');
     if (body) {
         body.innerHTML = ''; // Clear everything
+        
+        // REORDER: Decoded Input & Output FIRST
 
-        // 1. Request Params
+        // 1. Decoded Input (Placeholder)
+        const decodedInputContent = document.createElement('div');
+        decodedInputContent.id = 'decoded-input-content';
+        decodedInputContent.innerHTML = '<span style="color:var(--text-muted);">Loading decoded data...</span>';
+        const decodedInputSection = createCollapsibleSection('Decoded Input', decodedInputContent, true); // Default Open
+        decodedInputSection.id = 'section-decoded-input';
+        decodedInputSection.style.display = 'none'; // Hide until loaded
+        body.appendChild(decodedInputSection);
+        
+        // 2. Decoded Output (Placeholder)
+        const decodedOutputContent = document.createElement('div');
+        decodedOutputContent.id = 'decoded-output-content';
+        decodedOutputContent.innerHTML = '<span style="color:var(--text-muted);">Loading decoded output...</span>';
+        const decodedOutputSection = createCollapsibleSection('Decoded Output', decodedOutputContent, true);
+        decodedOutputSection.id = 'section-decoded-output';
+        decodedOutputSection.style.display = 'none'; // Hide until loaded
+        body.appendChild(decodedOutputSection);
+
+        // 3. Request Params
         const reqParamsContent = document.createElement('div');
         reqParamsContent.className = 'code-block';
         reqParamsContent.textContent = JSON.stringify(displayReq, null, 2);
         body.appendChild(createCollapsibleSection('Request Params', reqParamsContent, false));
 
-        // 2. Decoded Input (Placeholder)
-        const decodedInputContent = document.createElement('div');
-        decodedInputContent.id = 'decoded-input-content';
-        decodedInputContent.className = 'code-block';
-        decodedInputContent.textContent = 'Loading...';
-        const decodedInputSection = createCollapsibleSection('Decoded Input', decodedInputContent, true); // Default Open
-        decodedInputSection.id = 'section-decoded-input';
-        decodedInputSection.style.display = 'none'; // Hide until loaded
-        body.appendChild(decodedInputSection);
-
-        // 3. Response
+        // 4. Response
         const responseContent = document.createElement('div');
         responseContent.className = 'code-block';
         responseContent.textContent = displayRes ? JSON.stringify(displayRes, null, 2) : 'No Response';
         body.appendChild(createCollapsibleSection('Response', responseContent, false));
-
-         // 4. Decoded Output (Placeholder)
-        const decodedOutputContent = document.createElement('div');
-        decodedOutputContent.id = 'decoded-output-content';
-        decodedOutputContent.className = 'code-block';
-        decodedOutputContent.textContent = 'Loading...';
-        const decodedOutputSection = createCollapsibleSection('Decoded Output', decodedOutputContent, false);
-        decodedOutputSection.id = 'section-decoded-output';
-        decodedOutputSection.style.display = 'none'; // Hide until loaded
-        body.appendChild(decodedOutputSection);
     }
 
     // Reset Result Container
@@ -828,26 +859,58 @@ async function decodeRequestIfPossible(reqData: RequestData, subIndex: number | 
         if (metadata) {
             const { contractName, abi } = metadata;
 
-            // 1. Display Contract Name (if available)
+            // 1. Display Contract Name (if available) - Improved Header
             if (contractName) {
-                 let nameEl = document.getElementById('detail-contract-name');
-                 if (!nameEl) {
-                     nameEl = document.createElement('div');
-                     nameEl.id = 'detail-contract-name';
-                     nameEl.style.fontSize = '12px';
-                     nameEl.style.color = 'var(--text-secondary)';
-                     nameEl.style.marginTop = '4px';
-                     // Fix: Insert after detailUrl, inside its parent wrapper
-                     if (detailUrl.parentNode) {
-                        detailUrl.parentNode.insertBefore(nameEl, detailUrl.nextSibling);
-                     }
+                 const headerActions = document.querySelector('.detail-actions');
+                 const headerInfo = document.querySelector('.detail-header > div:first-child');
+                 
+                 // Remove old if exists
+                 const existingContractName = document.getElementById('detail-contract-name');
+                 if (existingContractName) existingContractName.remove();
+
+                 if (headerInfo) {
+                     const contractInfo = document.createElement('div');
+                     contractInfo.id = 'detail-contract-name';
+                     contractInfo.className = 'contract-info';
+                     contractInfo.style.marginTop = '8px';
+                     
+                     contractInfo.innerHTML = `
+                        <div class="contract-name">${contractName}</div>
+                        <div class="contract-address">${to}</div>
+                     `;
+                     
+                     // Append to the header info section
+                     headerInfo.appendChild(contractInfo);
+                     
+                     // Also hide the URL if it's taking up too much space or maybe just let it stack?
+                     // The CSS should handle it with flex-col
                  }
-                 nameEl.textContent = `Contract: ${contractName}`;
             }
 
             // 2. Decode Input
             try {
                 const decoded = decodeFunctionData({ abi, data: data as Hex });
+                
+                // UPDATE SIDEBAR / LIST ITEM WITH FUNCTION NAME
+                // We do this if it's the main request (not sub) or we handle sub item updates too
+                if (subIndex === null) {
+                    const methodTag = document.getElementById(`method-tag-${reqData.id}`);
+                    if (methodTag) {
+                        // Check if it's currently showing selector or generic eth_call
+                        const currentText = methodTag.textContent;
+                        // Replace if it's eth_call or a selector
+                        if (currentText && (currentText === 'eth_call' || currentText.startsWith('0x'))) {
+                             methodTag.textContent = decoded.functionName;
+                             // We could add a 'resolved' class to style it differently
+                        }
+                    }
+                } else {
+                     // Update Sub Item in List
+                     // .request-item[data-id="${reqData.id}-${subIndex}"] .some-selector
+                     // We didn't add a specific class for the "Call #1" text span, but we can look for it
+                }
+                
+                // Update Detail Header
                 if (detailMethod) {
                     detailMethod.textContent = decoded.functionName;
                 }
@@ -857,58 +920,60 @@ async function decodeRequestIfPossible(reqData: RequestData, subIndex: number | 
                 
                 if (decodedInputSection && decodedInputContent) {
                     decodedInputSection.style.display = 'block';
-                    decodedInputContent.textContent = JSON.stringify(decoded.args, (key, value) => 
-                        typeof value === 'bigint' ? value.toString() : value
-                    , 2);
+                    decodedInputContent.innerHTML = renderDecodedParams(decoded.args);
+                    decodedInputContent.className = 'decoded-container'; // Override code-block if needed
                 }
 
                 // 3. Decode Output
                 const isError = reqData.rpcResponse && !!reqData.rpcResponse.error;
                 
-                if (returnData === '0x' && isError) {
-                     const decodedOutputSection = document.getElementById('section-decoded-output');
-                     const decodedOutputContent = document.getElementById('decoded-output-content');
-                     if (decodedOutputSection && decodedOutputContent) {
+                const decodedOutputSection = document.getElementById('section-decoded-output');
+                const decodedOutputContent = document.getElementById('decoded-output-content');
+                
+                if (decodedOutputSection && decodedOutputContent) {
+                    if (returnData === '0x' && isError) {
                         decodedOutputSection.style.display = 'block';
-                        decodedOutputContent.textContent = "Reverted (No data)";
-                     }
-                } else if (returnData && returnData !== '0x') {
-                    try {
-                        const decodedResult = decodeFunctionResult({
-                            abi,
-                            functionName: decoded.functionName,
-                            data: returnData as Hex
-                        });
-
-                        const decodedOutputSection = document.getElementById('section-decoded-output');
-                        const decodedOutputContent = document.getElementById('decoded-output-content');
-                        
-                        if (decodedOutputSection && decodedOutputContent) {
-                            decodedOutputSection.style.display = 'block';
-                            decodedOutputContent.textContent = JSON.stringify(decodedResult, (key, value) => 
-                                typeof value === 'bigint' ? value.toString() : value
-                            , 2);
-                        }
-                    } catch (err) {
-                        // Fallback: Try decoding as Error
+                        decodedOutputContent.innerHTML = '<div style="color:var(--accent-error); padding:12px;">Transaction Reverted (No Error Data)</div>';
+                        decodedOutputContent.className = 'decoded-container';
+                    } else if (returnData && returnData !== '0x') {
                         try {
-                            const decodedError = decodeErrorResult({
+                            const decodedResult = decodeFunctionResult({
                                 abi,
+                                functionName: decoded.functionName,
                                 data: returnData as Hex
                             });
 
-                            const decodedOutputSection = document.getElementById('section-decoded-output');
-                            const decodedOutputContent = document.getElementById('decoded-output-content');
-                            
-                            if (decodedOutputSection && decodedOutputContent) {
+                            decodedOutputSection.style.display = 'block';
+                            decodedOutputContent.innerHTML = renderDecodedParams(decodedResult);
+                            decodedOutputContent.className = 'decoded-container';
+
+                        } catch (err) {
+                            // Fallback: Try decoding as Error
+                            try {
+                                const decodedError = decodeErrorResult({
+                                    abi,
+                                    data: returnData as Hex
+                                });
+
                                 decodedOutputSection.style.display = 'block';
-                                decodedOutputContent.textContent = "Reverted: " + JSON.stringify(decodedError, (key, value) => 
-                                    typeof value === 'bigint' ? value.toString() : value
-                                , 2);
+                                decodedOutputContent.innerHTML = `
+                                    <div class="decoded-error-name" style="margin-bottom:12px; font-weight:bold;">
+                                        Error: ${decodedError.errorName}
+                                    </div>
+                                    ${renderDecodedParams(decodedError.args)}
+                                `;
+                                decodedOutputContent.className = 'decoded-container';
+
+                            } catch (err2) {
+                                // console.warn('Output decode failed', err, err2);
                             }
-                        } catch (err2) {
-                            console.warn('Output decode failed', err, err2);
                         }
+                    } else {
+                        // Empty return data and no error -> likely just success with no return
+                         if (!isError) {
+                             // Hide output section if nothing to show
+                             decodedOutputSection.style.display = 'none';
+                         }
                     }
                 }
 
@@ -921,17 +986,66 @@ async function decodeRequestIfPossible(reqData: RequestData, subIndex: number | 
                     // Check if it's a selector not found error (often "Function selector ... not found")
                     const msg = err.message || String(err);
                     if (msg.includes('selector') || msg.includes('not found')) {
-                         decodedInputContent.textContent = `Error: Function selector not found in ABI.\n\nRaw Error: ${msg}`;
+                         decodedInputContent.innerHTML = `
+                            <div style="color:var(--accent-error); padding:12px;">
+                                <strong>Error: Function selector not found in ABI.</strong><br>
+                                <span style="font-size:11px; opacity:0.8;">Raw Error: ${msg}</span>
+                            </div>
+                         `;
+                         decodedInputContent.className = 'decoded-container';
                     } else {
                          decodedInputContent.textContent = `Decode Error: ${msg}`;
+                         decodedInputContent.style.color = 'var(--accent-error)';
                     }
-                    decodedInputContent.style.color = 'var(--accent-error)';
                 }
             }
         }
     } catch (e) {
         // console.warn('Decode failed', e);
     }
+}
+
+function renderDecodedParams(args: any): string {
+    if (!args) return '<div style="padding:12px; color:var(--text-muted);">No parameters</div>';
+    
+    // Check if empty array or object
+    if (Array.isArray(args) && args.length === 0) return '<div style="padding:12px; color:var(--text-muted);">No parameters</div>';
+    if (typeof args === 'object' && Object.keys(args).length === 0) return '<div style="padding:12px; color:var(--text-muted);">No parameters</div>';
+
+    let html = '<div class="decoded-params-list">';
+    
+    if (typeof args === 'object' && args !== null) {
+         const keys = Object.keys(args);
+         // Check if we have any non-numeric keys (named params)
+         const hasNamed = keys.some(k => !/^\d+$/.test(k));
+
+         Object.entries(args).forEach(([key, value]) => {
+             // If we have named parameters, skip the numeric indices to avoid duplication
+             if (hasNamed && /^\d+$/.test(key)) return;
+
+             let label = key;
+             let valStr = String(value);
+             
+             if (typeof value === 'object') {
+                 valStr = JSON.stringify(value, (k, v) => typeof v === 'bigint' ? v.toString() : v, 2);
+             } else if (typeof value === 'bigint') {
+                 valStr = value.toString();
+             }
+             
+             html += `
+                <div class="decoded-param-row">
+                    <div class="decoded-param-label">${label}</div>
+                    <div class="decoded-param-value">${valStr}</div>
+                </div>
+             `;
+         });
+    } else {
+        // Primitive?
+        html += `<div style="padding:12px;">${args}</div>`;
+    }
+    
+    html += '</div>';
+    return html;
 }
 
 function createCollapsibleSection(title: string, contentNode: HTMLElement, isOpen: boolean = false): HTMLElement {
