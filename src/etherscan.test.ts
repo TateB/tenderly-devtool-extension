@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { EtherscanClient } from '../../src/etherscan';
+import { EtherscanClient } from './etherscan';
 
 // --- Chrome Storage Mock ---
 

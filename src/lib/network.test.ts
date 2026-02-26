@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { detectNetworkFromUrl } from '../../src/panel-utils';
+import { detectNetworkFromUrl } from './network';
 
 describe('detectNetworkFromUrl', () => {
   test('returns "1" (mainnet) for empty string', () => {
