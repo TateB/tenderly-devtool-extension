@@ -8,18 +8,22 @@
     "@types/ws": "^8.18.1",
     "happy-dom": "^20.7.0",
     "puppeteer": "^24.32.1",
+    "vite": "^7.3.1",
+    "vite-plugin-solid": "^2.11.10",
     "ws": "^8.18.3"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "solid-js": "^1.9.11",
     "viem": "^2.41.2"
   },
   "scripts": {
-    "build": "bun run build.ts",
-    "test:unit": "bun test tests/unit/",
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "test:unit": "bun test src/",
     "test:e2e": "bun test tests/e2e/puppeteer.test.ts",
-    "test": "bun test tests/unit/"
+    "test": "bun test src/"
   }
 }

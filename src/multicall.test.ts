@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { encodeFunctionData, encodeFunctionResult } from 'viem';
-import { MulticallDecoder } from '../../src/multicall';
+import { MulticallDecoder } from './multicall';
 
 const MULTICALL3_ADDRESS = '0xcA11bde05977b3631167028862bE2a173976cA11';
 const AGGREGATE3_SELECTOR = '0x82ad56cb';
