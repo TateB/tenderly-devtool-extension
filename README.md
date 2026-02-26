@@ -25,6 +25,14 @@ The source code is located in `src/` and static assets in `public/`.
 - Run `bun run build` to rebuild the extension after changes.
 - Using `bun run src/verify_decoder.ts` to verify the decoder logic.
 
+## Testing
+
+The extension uses Bun and Puppeteer for End-to-End (E2E) testing, natively interacting with the Chrome DevTools extension environment. Tests verify UI structural integrity, settings persistence, and network interception capabilities.
+
+1. Ensure dependencies are installed: `bun install`
+2. Build the extension: `bun run build`
+3. Run the E2E test suite: `bun test tests/e2e/puppeteer.test.ts`
+
 ## Configuration
 
 1. Open Chrome DevTools.
