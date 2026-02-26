@@ -1,5 +1,6 @@
 import { createMemo, createSignal } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
+import { decodeFunctionData, type Hex } from 'viem';
 import { EtherscanClient } from '../etherscan';
 import { MulticallDecoder } from '../multicall';
 import { detectNetwork } from './network';
@@ -151,14 +152,6 @@ export async function handleRequest(request: any) {
       }
     }
 
-    // Prefetch etherscan metadata
-    const client = etherscanClient();
-    if (to && to !== '0x' && client) {
-      detectNetwork(request.request.url).then((chainId) => {
-        client.prefetch(to!, chainId);
-      });
-    }
-
     const reqId = Date.now() + Math.random().toString();
     const reqData: RequestData = {
       id: reqId,
@@ -178,10 +171,73 @@ export async function handleRequest(request: any) {
       setSelectedRequestId(reqId);
       setSelectedSubIndex(null);
     }
+
+    // Eagerly resolve function/contract names in background
+    const client = etherscanClient();
+    if (client && (to || multicallData)) {
+      const reqUrl = request.request.url;
+      detectNetwork(reqUrl).then(async (chainId) => {
+        // Resolve main request
+        if (to && to !== '0x') {
+          const metadata = await client.getContractMetadata(to!, chainId);
+          if (metadata) {
+            const inputData = rpcRequest.params?.[0]?.data;
+            let functionName: string | undefined;
+            if (inputData && inputData !== '0x' && inputData.length >= 10 && metadata.abi.length > 0) {
+              try {
+                const decoded = decodeFunctionData({ abi: metadata.abi, data: inputData as Hex });
+                functionName = decoded.functionName;
+              } catch {}
+            }
+            setRequests(produce((list) => {
+              const entry = list.find((r) => r.id === reqId);
+              if (entry) {
+                entry.resolvedContractName = metadata.contractName;
+                if (functionName) entry.resolvedFunctionName = functionName;
+              }
+            }));
+          }
+        }
+
+        // Resolve multicall sub-call names
+        if (multicallData) {
+          const uniqueTargets = [...new Set(multicallData.map(m => m.target.toLowerCase()))];
+          const metadataMap = new Map<string, { contractName: string; abi: any[] }>();
+          await Promise.all(
+            uniqueTargets.map(async (target) => {
+              const meta = await client.getContractMetadata(target, chainId);
+              if (meta) metadataMap.set(target, meta);
+            })
+          );
+
+          setRequests(produce((list) => {
+            const entry = list.find((r) => r.id === reqId);
+            if (!entry?.multicallData) return;
+            for (let i = 0; i < entry.multicallData.length; i++) {
+              const sub = entry.multicallData[i];
+              const meta = metadataMap.get(sub.target.toLowerCase());
+              if (meta) {
+                sub.resolvedContractName = meta.contractName;
+                if (sub.callData && sub.callData.length >= 10 && meta.abi.length > 0) {
+                  try {
+                    const decoded = decodeFunctionData({ abi: meta.abi, data: sub.callData as Hex });
+                    sub.resolvedFunctionName = decoded.functionName;
+                  } catch {}
+                }
+              }
+            }
+          }));
+        }
+      });
+    }
   });
 }
 
 export function selectRequest(id: string, subIndex: number | null = null) {
   setSelectedRequestId(id);
   setSelectedSubIndex(subIndex);
+}
+
+export async function clearAbiCache(): Promise<void> {
+  await EtherscanClient.clearCache();
 }

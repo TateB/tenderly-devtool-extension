@@ -95,17 +95,6 @@ const DetailView: Component = () => {
       // Decode input
       try {
         decoded = decodeFunctionData({ abi, data: data as Hex });
-
-        // Also update the method tag in the sidebar
-        if (subIdx() === null) {
-          const methodTag = document.getElementById(`method-tag-${selectedRequestId()}`);
-          if (methodTag) {
-            const currentText = methodTag.textContent;
-            if (currentText && (currentText === 'eth_call' || currentText.startsWith('0x'))) {
-              methodTag.textContent = decoded.functionName;
-            }
-          }
-        }
       } catch (err: any) {
         const msg = err.message || String(err);
         if (msg.includes('selector') || msg.includes('not found')) {
@@ -185,10 +174,6 @@ const DetailView: Component = () => {
                   </span>
                 </div>
               </div>
-              <div id="detail-url" class="detail-header-url">
-                {dd().url}
-              </div>
-
               {/* Contract info */}
               <Show when={decodeResult()?.contractName}>
                 <div id="detail-contract-name" class="contract-info">
@@ -274,6 +259,11 @@ const DetailView: Component = () => {
                 {dd().displayRes ? JSON.stringify(dd().displayRes, null, 2) : 'No Response'}
               </div>
             </CollapsibleSection>
+
+            {/* RPC URL */}
+            <div class="detail-rpc-url">
+              {dd().url}
+            </div>
           </div>
         </div>
       )}

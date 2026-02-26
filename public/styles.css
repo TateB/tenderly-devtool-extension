@@ -440,23 +440,16 @@ a:focus-visible {
   gap: 8px;
 }
 
-.detail-header-url {
+.detail-rpc-url {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  padding-top: 16px;
+  margin-top: 8px;
+  border-top: 1px solid var(--border-color);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
-  max-height: 0;
-  opacity: 0;
-  transition: max-height 0.2s, opacity 0.2s, margin 0.2s;
-  margin-top: 0;
-}
-
-.detail-header-info:hover .detail-header-url {
-  max-height: 20px;
-  opacity: 1;
-  margin-top: 2px;
 }
 
 .detail-actions {
@@ -570,6 +563,9 @@ a:focus-visible {
 .tooltip-wrapper {
   position: relative;
   display: inline-flex;
+  padding: 6px;
+  margin: -6px;
+  cursor: default;
 }
 
 .tooltip-wrapper .tooltip {
@@ -579,6 +575,8 @@ a:focus-visible {
   transform: translateX(-50%);
   background: var(--surface-active);
   color: var(--text-main);
+  font-family: var(--font-sans);
+  font-weight: 500;
   font-size: 10px;
   padding: 2px 8px;
   border-radius: 3px;
@@ -586,7 +584,7 @@ a:focus-visible {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s;
-  z-index: 10;
+  z-index: 1000;
 }
 
 .tooltip-wrapper:hover .tooltip {
@@ -767,7 +765,6 @@ a:focus-visible {
 .btn-primary {
   background: var(--primary-color);
   color: #fff;
-  box-shadow: 0 2px 8px var(--primary-glow);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -1039,26 +1036,6 @@ input[type="checkbox"] {
 .request-item.sub-item.active::before {
   display: none;
   /* Remove big left border */
-}
-
-.expand-icon {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 8px;
-  color: var(--text-muted);
-  transition: transform 0.2s;
-  cursor: pointer;
-}
-
-.expand-icon:hover {
-  color: var(--text-main);
-}
-
-.expand-icon.expanded {
-  transform: rotate(90deg);
 }
 
 /* --- Utility & Shared Classes --- */
