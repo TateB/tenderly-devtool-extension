@@ -409,15 +409,38 @@ a:focus-visible {
 }
 
 .detail-header {
-  padding: 12px 24px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--border-color);
   background: var(--surface-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 64px;
+  min-height: 44px;
   flex-shrink: 0;
-  gap: 16px; /* Ensure gap between content and actions */
+  gap: 16px;
+}
+
+.detail-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.detail-header-top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-header-url {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .detail-actions {
@@ -519,26 +542,58 @@ a:focus-visible {
 /* Contract Info Header */
 .contract-info {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0; /* Enable truncation in children */
-    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
 }
 
 .contract-name {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 12px;
     color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .contract-address {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-muted);
+    cursor: pointer;
+    position: relative;
+    white-space: nowrap;
+    transition: color 0.15s;
+    border-bottom: 1px dashed transparent;
+}
+
+.contract-address:hover {
+    color: var(--text-secondary);
+    border-bottom-color: var(--text-muted);
+}
+
+.contract-address .copy-hint {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface-active);
+    color: var(--text-main);
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.contract-address:hover .copy-hint {
+    opacity: 1;
 }
 
 .url-container {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;

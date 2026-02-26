@@ -540,8 +540,8 @@ function selectRequest(id: string, subReqIndex: number | null = null) {
     // Prepare Detail View Header
     if (detailMethod) detailMethod.textContent = isSubRequest ? 'ETH_CALL (Sub)' : reqData.rpcRequest.method;
     if (detailUrl) {
-         // Prevent text overflow in header
-         detailUrl.innerHTML = `<div class="url-container" title="${reqData.url}">${reqData.url}</div>`;
+         detailUrl.textContent = reqData.url;
+         detailUrl.title = reqData.url;
     }
     
     // Clear Header extra elements (Contract Name)
@@ -863,29 +863,44 @@ async function decodeRequestIfPossible(reqData: RequestData, subIndex: number | 
 
             // 1. Display Contract Name (if available) - Improved Header
             if (contractName) {
-                 const headerActions = document.querySelector('.detail-actions');
-                 const headerInfo = document.querySelector('.detail-header > div:first-child');
+                 const headerInfo = document.querySelector('.detail-header-info');
                  
                  // Remove old if exists
                  const existingContractName = document.getElementById('detail-contract-name');
                  if (existingContractName) existingContractName.remove();
 
                  if (headerInfo) {
+                     const truncatedAddr = to.length > 10 ? `${to.slice(0, 6)}…${to.slice(-4)}` : to;
+                     
                      const contractInfo = document.createElement('div');
                      contractInfo.id = 'detail-contract-name';
                      contractInfo.className = 'contract-info';
-                     contractInfo.style.marginTop = '8px';
                      
                      contractInfo.innerHTML = `
                         <div class="contract-name">${contractName}</div>
-                        <div class="contract-address">${to}</div>
+                        <div class="contract-address" title="${to}"><span class="copy-hint">Click to copy</span>${truncatedAddr}</div>
                      `;
+                     
+                     // Click-to-copy on the address
+                     const addrEl = contractInfo.querySelector('.contract-address');
+                     if (addrEl) {
+                         addrEl.addEventListener('click', () => {
+                             navigator.clipboard.writeText(to).then(() => {
+                                 const hint = addrEl.querySelector('.copy-hint') as HTMLElement;
+                                 if (hint) {
+                                     hint.textContent = 'Copied!';
+                                     hint.style.opacity = '1';
+                                     setTimeout(() => {
+                                         hint.textContent = 'Click to copy';
+                                         hint.style.opacity = '';
+                                     }, 1200);
+                                 }
+                             });
+                         });
+                     }
                      
                      // Append to the header info section
                      headerInfo.appendChild(contractInfo);
-                     
-                     // Also hide the URL if it's taking up too much space or maybe just let it stack?
-                     // The CSS should handle it with flex-col
                  }
             }
 
