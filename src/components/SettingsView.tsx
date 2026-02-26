@@ -61,13 +61,13 @@ const SettingsView: Component = () => {
             </svg>
             Back
           </button>
-          <h2 style={{ 'font-size': '18px' }}>Settings</h2>
+          <h2 class="settings-title">Settings</h2>
         </div>
 
         <div class="settings-body-page">
           <div class="settings-section">
             <h3 class="section-title">Tenderly API</h3>
-            <div style={{ display: 'flex', 'flex-direction': 'column', gap: '12px', 'margin-bottom': '20px' }}>
+            <div class="form-stack">
               <div class="form-group">
                 <label>API Key</label>
                 <input
@@ -79,8 +79,8 @@ const SettingsView: Component = () => {
                   value={currentConfig().tenderly_api_key || ''}
                 />
               </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div class="form-group" style={{ flex: '1' }}>
+              <div class="form-row">
+                <div class="form-group">
                   <label>Account Slug</label>
                   <input
                     type="text"
@@ -91,7 +91,7 @@ const SettingsView: Component = () => {
                     value={currentConfig().tenderly_account_slug || ''}
                   />
                 </div>
-                <div class="form-group" style={{ flex: '1' }}>
+                <div class="form-group">
                   <label>Project Slug</label>
                   <input
                     type="text"
@@ -103,7 +103,7 @@ const SettingsView: Component = () => {
                   />
                 </div>
               </div>
-              <div style={{ 'font-size': '11px', color: 'var(--text-muted)' }}>
+              <div class="form-hint">
                 Found in your Tenderly Dashboard URL or Project Settings.
               </div>
             </div>
@@ -111,7 +111,7 @@ const SettingsView: Component = () => {
             <div class="divider" />
 
             <h3 class="section-title">Etherscan API</h3>
-            <div style={{ 'margin-bottom': '20px' }}>
+            <div class="form-section-spacing">
               <div class="form-group">
                 <label>Etherscan API Key</label>
                 <input
@@ -123,7 +123,7 @@ const SettingsView: Component = () => {
                   value={currentConfig().etherscan_api_key || ''}
                 />
               </div>
-              <div style={{ 'font-size': '11px', color: 'var(--text-muted)', 'margin-top': '6px' }}>
+              <div class="form-hint">
                 Required for fetching contract ABIs automatically.
               </div>
             </div>
@@ -162,7 +162,7 @@ const SettingsView: Component = () => {
             <div class="divider" />
 
             <h3 class="section-title">Network</h3>
-            <div style={{ 'margin-bottom': '24px' }}>
+            <div class="form-section-spacing-lg">
               <div class="form-group">
                 <label>Chain ID Override</label>
                 <input
@@ -174,13 +174,13 @@ const SettingsView: Component = () => {
                   value={currentConfig().tenderly_chain_id || ''}
                 />
               </div>
-              <div style={{ 'font-size': '11px', color: 'var(--text-muted)', 'margin-top': '6px' }}>
+              <div class="form-hint">
                 Optional: Force a specific Chain ID if auto-detection fails.
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', 'margin-top': '40px' }}>
-              <button id="save-config" class="btn btn-primary" style={{ 'min-width': '120px' }} onClick={handleSave}>
+            <div class="button-row">
+              <button id="save-config" class="btn btn-primary btn-save" onClick={handleSave}>
                 Save Changes
               </button>
               <button id="reset-config" class="btn btn-secondary" onClick={handleReset}>
@@ -189,14 +189,8 @@ const SettingsView: Component = () => {
             </div>
             <div
               id="save-status"
-              style={{
-                color: 'var(--accent-success)',
-                'font-size': '12px',
-                'margin-top': '12px',
-                opacity: saveVisible() ? '1' : '0',
-                transition: 'opacity 0.3s',
-                'font-weight': '500',
-              }}
+              class="save-status"
+              style={{ opacity: saveVisible() ? '1' : '0' }}
             >
               Saved Successfully
             </div>

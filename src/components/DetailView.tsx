@@ -175,13 +175,17 @@ const DetailView: Component = () => {
                 <div id="detail-method" class="method-tag">
                   {resolvedMethod()}
                 </div>
-                <div
-                  id="detail-status-indicator"
-                  class={`status-indicator ${dd().isError ? 'error' : 'success'}`}
-                  title={dd().isError ? 'Request Failed' : 'Request Successful'}
-                />
+                <div class="tooltip-wrapper">
+                  <div
+                    id="detail-status-indicator"
+                    class={`status-indicator ${dd().isError ? 'error' : 'success'}`}
+                  />
+                  <span class="tooltip">
+                    {dd().isError ? 'Request Failed' : 'Request Successful'}
+                  </span>
+                </div>
               </div>
-              <div id="detail-url" class="detail-header-url" title={dd().url}>
+              <div id="detail-url" class="detail-header-url">
                 {dd().url}
               </div>
 
@@ -215,7 +219,7 @@ const DetailView: Component = () => {
               >
                 <div id="decoded-input-content" class="decoded-container">
                   <Show when={decodeResult()?.decodedInput} fallback={
-                    <div style={{ color: 'var(--accent-error)', padding: '12px' }}>
+                    <div class="decode-error-text">
                       <strong>Error: {decodeResult()?.decodeError}</strong>
                     </div>
                   }>
@@ -238,12 +242,12 @@ const DetailView: Component = () => {
                       <Show
                         when={!err().isEmptyRevert}
                         fallback={
-                          <div style={{ color: 'var(--accent-error)', padding: '12px' }}>
+                          <div class="decode-error-text">
                             Transaction Reverted (No Error Data)
                           </div>
                         }
                       >
-                        <div class="decoded-error-name" style={{ 'margin-bottom': '12px', 'font-weight': 'bold' }}>
+                        <div class="decoded-error-name">
                           Error: {err().errorName}
                         </div>
                         <DecodedParams args={err().args} />

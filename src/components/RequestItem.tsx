@@ -14,6 +14,7 @@ const RequestItem: Component<RequestItemProps> = (props) => {
   const isMulticall = () => !!req().multicallData;
 
   const statusClass = () => (isError() ? 'error' : 'success');
+  const statusLabel = () => (isError() ? 'Request Failed' : 'Request Successful');
   const timeStr = () =>
     req().timestamp.toLocaleTimeString([], {
       hour: '2-digit',
@@ -66,11 +67,10 @@ const RequestItem: Component<RequestItemProps> = (props) => {
         }}
       >
         <div class="req-header">
-          <div style={{ display: 'flex', 'align-items': 'center', gap: '6px', 'min-width': '0' }}>
+          <div class="req-header-left">
             <Show when={isMulticall()}>
               <div
-                class="expand-icon"
-                style={{ transform: expanded() ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                class={`expand-icon ${expanded() ? 'expanded' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setExpanded((v) => !v);
@@ -83,14 +83,17 @@ const RequestItem: Component<RequestItemProps> = (props) => {
               {methodLabel()}
             </span>
             <Show when={multiInfo()}>
-              <span class={`method-tag multi ${multiInfo()!.multiClass}`} style={{ 'font-size': '9px' }}>
+              <span class={`method-tag multi ${multiInfo()!.multiClass} multi-label`}>
                 MULTI
               </span>
             </Show>
           </div>
-          <span class={`status-indicator ${statusClass()}`} />
+          <div class="tooltip-wrapper">
+            <span class={`status-indicator ${statusClass()}`} />
+            <span class="tooltip">{statusLabel()}</span>
+          </div>
         </div>
-        <div style={{ display: 'flex', 'justify-content': 'space-between', 'align-items': 'center', width: '100%' }}>
+        <div class="req-bottom-row">
           <div class="req-summary">
             {summary()}
           </div>
@@ -105,6 +108,7 @@ const RequestItem: Component<RequestItemProps> = (props) => {
             {(sub, idx) => {
               const subId = () => `${req().id}-${idx()}`;
               const subStatus = () => (sub.success ? 'success' : 'error');
+              const subLabel = () => (sub.success ? 'Call Successful' : 'Call Failed');
               const subSelector = () => sub.callData.substring(0, 10);
               const subActive = () =>
                 selectedRequestId() === req().id && selectedSubIndex() === idx();
@@ -120,14 +124,17 @@ const RequestItem: Component<RequestItemProps> = (props) => {
                     selectRequest(req().id, idx());
                   }}
                 >
-                  <div style={{ display: 'flex', 'align-items': 'center', gap: '8px' }}>
-                    <span class={`status-indicator ${subStatus()}`} style={{ width: '4px', height: '4px' }} />
-                    <div style={{ 'font-family': "'JetBrains Mono', monospace", 'font-size': '11px', color: 'var(--text-secondary)' }}>
+                  <div class="sub-item-row">
+                    <div class="tooltip-wrapper">
+                      <span class={`status-indicator sm ${subStatus()}`} />
+                      <span class="tooltip">{subLabel()}</span>
+                    </div>
+                    <div class="sub-item-info">
                       #{idx() + 1}{' '}
-                      <span style={{ opacity: '0.7', 'font-size': '10px' }}>{subSelector()}</span>
+                      <span class="sub-item-selector">{subSelector()}</span>
                     </div>
                   </div>
-                  <div style={{ 'font-size': '10px', opacity: '0.5', 'font-family': 'var(--font-mono)' }}>
+                  <div class="sub-item-target">
                     {sub.target.substring(0, 8)}...
                   </div>
                 </div>

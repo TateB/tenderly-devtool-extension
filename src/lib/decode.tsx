@@ -35,12 +35,12 @@ const DecodedParams: Component<DecodedParamsProps> = (props) => {
     <Show
       when={!isEmpty()}
       fallback={
-        <div style={{ padding: '12px', color: 'var(--text-muted)' }}>No parameters</div>
+        <div class="decode-empty-text">No parameters</div>
       }
     >
       <Show
         when={typeof props.args === 'object' && props.args !== null}
-        fallback={<div style={{ padding: '12px' }}>{String(props.args)}</div>}
+        fallback={<div class="decode-raw-text">{String(props.args)}</div>}
       >
         <div class="decoded-params-list">
           <For each={entries()}>

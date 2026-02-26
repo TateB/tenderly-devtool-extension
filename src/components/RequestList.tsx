@@ -12,7 +12,7 @@ const RequestList: Component = () => {
             <div class="empty-state">
               <div class="empty-icon">📡</div>
               <p>Waiting for requests...</p>
-              <div style={{ 'font-size': '11px', opacity: '0.6', 'margin-top': '4px' }}>
+              <div class="empty-state-hint">
                 Interact with your dApp
               </div>
             </div>

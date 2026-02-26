@@ -173,9 +173,8 @@ const SimulateButton: Component<SimulateButtonProps> = (props) => {
       </div>
       <button
         id="simulate-btn"
-        class="btn btn-primary"
+        class={`btn btn-primary${state() === 'error' && !simulationId() ? ' btn-error' : ''}`}
         disabled={state() === 'simulating'}
-        style={state() === 'error' && !simulationId() ? { background: 'var(--accent-error)' } : {}}
         onClick={handleClick}
       >
         <span>{buttonText()}</span>
