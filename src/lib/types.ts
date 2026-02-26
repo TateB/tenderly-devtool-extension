@@ -15,6 +15,8 @@ export interface RequestData {
   rpcRequest: any;
   rpcResponse: any;
   multicallData?: MulticallItem[];
+  resolvedFunctionName?: string;
+  resolvedContractName?: string;
 }
 
 export interface MulticallItem {
@@ -23,4 +25,6 @@ export interface MulticallItem {
   callData: string;
   success?: boolean;
   returnData?: string;
+  resolvedFunctionName?: string;
+  resolvedContractName?: string;
 }

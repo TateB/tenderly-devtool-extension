@@ -1,9 +1,10 @@
-import { type Component, createSignal } from 'solid-js';
-import { config, loadConfig, resetConfig as resetConfigStore, saveConfig, setActiveTab } from '../lib/store';
+import { type Component, Show, createSignal } from 'solid-js';
+import { clearAbiCache, config, loadConfig, resetConfig as resetConfigStore, saveConfig, setActiveTab } from '../lib/store';
 import type { Config } from '../lib/types';
 
 const SettingsView: Component = () => {
   const [saveVisible, setSaveVisible] = createSignal(false);
+  const [cacheCleared, setCacheCleared] = createSignal(false);
 
   // Local form state initialized from store config
   let apiKeyRef!: HTMLInputElement;
@@ -193,6 +194,30 @@ const SettingsView: Component = () => {
               style={{ opacity: saveVisible() ? '1' : '0' }}
             >
               Saved Successfully
+            </div>
+
+            <div class="divider" />
+
+            <h3 class="section-title">Cache</h3>
+            <div class="form-section-spacing">
+              <div class="form-hint" style={{ "margin-bottom": "12px" }}>
+                Contract ABIs and names are cached permanently and refreshed automatically after 7 days.
+              </div>
+              <button
+                class="btn btn-secondary"
+                onClick={async () => {
+                  await clearAbiCache();
+                  setCacheCleared(true);
+                  setTimeout(() => setCacheCleared(false), 2000);
+                }}
+              >
+                Clear ABI Cache
+              </button>
+              <Show when={cacheCleared()}>
+                <span class="save-status" style={{ opacity: '1', "margin-left": "12px" }}>
+                  Cache Cleared
+                </span>
+              </Show>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { type Component, createSignal, For, Show } from 'solid-js';
+import { type Component, For, Show } from 'solid-js';
 import { selectedRequestId, selectedSubIndex, selectRequest } from '../lib/store';
 import type { RequestData } from '../lib/types';
 
@@ -7,8 +7,6 @@ interface RequestItemProps {
 }
 
 const RequestItem: Component<RequestItemProps> = (props) => {
-  const [expanded, setExpanded] = createSignal(false);
-
   const req = () => props.request;
   const isError = () => req().rpcResponse && req().rpcResponse.error;
   const isMulticall = () => !!req().multicallData;
@@ -23,6 +21,9 @@ const RequestItem: Component<RequestItemProps> = (props) => {
     });
 
   const methodLabel = () => {
+    const resolved = req().resolvedFunctionName;
+    if (resolved) return resolved;
+
     let label = req().rpcRequest.method;
     if (label === 'eth_call' || label === 'eth_estimateGas') {
       const data = req().rpcRequest.params?.[0]?.data;
@@ -68,17 +69,6 @@ const RequestItem: Component<RequestItemProps> = (props) => {
       >
         <div class="req-header">
           <div class="req-header-left">
-            <Show when={isMulticall()}>
-              <div
-                class={`expand-icon ${expanded() ? 'expanded' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setExpanded((v) => !v);
-                }}
-              >
-                ▶
-              </div>
-            </Show>
             <span class="method-tag" id={`method-tag-${req().id}`}>
               {methodLabel()}
             </span>
@@ -102,7 +92,7 @@ const RequestItem: Component<RequestItemProps> = (props) => {
       </div>
 
       {/* Sub-items for multicall */}
-      <Show when={isMulticall() && expanded()}>
+      <Show when={isMulticall()}>
         <div class="sub-request-list" id={`sub-list-${req().id}`}>
           <For each={req().multicallData}>
             {(sub, idx) => {
@@ -131,11 +121,13 @@ const RequestItem: Component<RequestItemProps> = (props) => {
                     </div>
                     <div class="sub-item-info">
                       #{idx() + 1}{' '}
-                      <span class="sub-item-selector">{subSelector()}</span>
+                      <span class="sub-item-selector">
+                        {sub.resolvedFunctionName || subSelector()}
+                      </span>
                     </div>
                   </div>
                   <div class="sub-item-target">
-                    {sub.target.substring(0, 8)}...
+                    {sub.resolvedContractName || `${sub.target.substring(0, 8)}...`}
                   </div>
                 </div>
               );

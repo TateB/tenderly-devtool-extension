@@ -525,13 +525,7 @@ describe('Tenderly DevTools Extension', () => {
         return document.querySelector('.method-tag.multi') !== null;
     }, 5000);
 
-    // Check that we can expand it
-    const expandIconExists = await panelFrame!.$eval('.expand-icon', el => el !== null).catch(() => false);
-    expect(expandIconExists).toBe(true);
-
-    await panelFrame!.$eval('.expand-icon', el => (el as HTMLElement).click());
-
-    // Check sub list becomes visible (Solid creates it when expanded)
+    // Sub-items are always visible (no expand icon needed)
     await safeWaitForCondition(() => {
         return !!document.querySelector('.sub-request-list');
     }, 2000);

@@ -2,7 +2,10 @@
 export interface ContractMetadata {
     contractName: string;
     abi: any[];
+    cachedAt?: number;
 }
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class EtherscanClient {
     private apiKey: string;
@@ -17,8 +20,6 @@ export class EtherscanClient {
 
     async prefetch(address: string, chainId: string = '1'): Promise<void> {
         if (!this.apiKey) return;
-        
-        // Just trigger getContractMetadata, which handles caching
         await this.getContractMetadata(address, chainId);
     }
 
@@ -26,21 +27,48 @@ export class EtherscanClient {
         if (!this.apiKey) return null;
 
         const cacheKey = this.getCacheKey(address, chainId);
-        
+
         // Check cache
         try {
             const cached = await new Promise<any>((resolve) => {
                 chrome.storage.local.get(cacheKey, (result) => resolve(result));
             });
-            
+
             if (cached && cached[cacheKey]) {
-                return cached[cacheKey] as ContractMetadata;
+                const entry = cached[cacheKey] as ContractMetadata;
+                const isStale = !entry.cachedAt || (Date.now() - entry.cachedAt > SEVEN_DAYS_MS);
+
+                if (!isStale) {
+                    return entry;
+                }
+
+                // Stale: return immediately but refresh in background
+                this.refreshInBackground(address, chainId, cacheKey);
+                return entry;
             }
         } catch (e) {
             console.warn('Cache read error', e);
         }
 
-        // Use Etherscan V2 API - action=getsourcecode returns both ABI and ContractName
+        // Cache miss: fetch and cache
+        const metadata = await this.fetchFromEtherscan(address, chainId);
+        if (metadata) {
+            chrome.storage.local.set({ [cacheKey]: metadata });
+            return metadata;
+        }
+
+        return null;
+    }
+
+    private refreshInBackground(address: string, chainId: string, cacheKey: string): void {
+        this.fetchFromEtherscan(address, chainId).then((metadata) => {
+            if (metadata) {
+                chrome.storage.local.set({ [cacheKey]: metadata });
+            }
+        }).catch(() => {});
+    }
+
+    private async fetchFromEtherscan(address: string, chainId: string): Promise<ContractMetadata | null> {
         const url = `https://api.etherscan.io/v2/api?chainid=${chainId}&module=contract&action=getsourcecode&address=${address}&apikey=${this.apiKey}`;
 
         try {
@@ -50,33 +78,20 @@ export class EtherscanClient {
             if (data.status === '1' && data.result && data.result.length > 0) {
                 const result = data.result[0];
                 let abi: any[] = [];
-                
-                // Parse ABI
+
                 if (result.ABI && result.ABI !== 'Contract source code not verified') {
-                     try {
+                    try {
                         abi = JSON.parse(result.ABI);
-                    } catch {
-                        // Keep empty or null
-                    }
+                    } catch {}
                 }
 
-                // If no ABI, we can't really do much, but maybe we still want the name?
-                // Requirement says "fetch ABIs... and save the values".
-                // If not verified, we might just return null or partial data.
-                // Lets return what we have if ABI is valid.
-                
                 if (abi && Array.isArray(abi)) {
-                    const metadata: ContractMetadata = {
+                    return {
                         contractName: result.ContractName || 'Unknown Contract',
-                        abi: abi
+                        abi,
+                        cachedAt: Date.now(),
                     };
-
-                    // Cache it
-                    chrome.storage.local.set({ [cacheKey]: metadata });
-                    return metadata;
                 }
-            } else {
-               // console.warn('Etherscan API error or no data:', data.message);
             }
         } catch (e) {
             console.error('Etherscan fetch error', e);
@@ -85,9 +100,21 @@ export class EtherscanClient {
         return null;
     }
 
-    // Backwards compatibility or convenience wrapper if needed, but we will mostly use getContractMetadata now
     async getAbi(address: string, chainId: string = '1'): Promise<any | null> {
         const metadata = await this.getContractMetadata(address, chainId);
         return metadata ? metadata.abi : null;
+    }
+
+    static clearCache(): Promise<void> {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(null, (all) => {
+                const cacheKeys = Object.keys(all).filter(k => k.startsWith('contract_metadata_'));
+                if (cacheKeys.length === 0) {
+                    resolve();
+                    return;
+                }
+                chrome.storage.local.remove(cacheKeys, () => resolve());
+            });
+        });
     }
 }
